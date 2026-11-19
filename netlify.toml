@@ -1,0 +1,27 @@
+# PowerUp Connect on Netlify
+# The screens are built by Vite into dist/public. The API runs as one Netlify
+# Function (netlify/functions/api.ts) and stores everything in Supabase.
+
+[build]
+  command = "npm run build:client"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
