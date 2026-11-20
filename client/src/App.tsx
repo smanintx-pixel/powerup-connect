@@ -18,6 +18,7 @@ import Messages from "@/pages/messages";
 import MessageThread from "@/pages/message-thread";
 import Sessions from "@/pages/sessions";
 import Businesses from "@/pages/businesses";
+import Resources from "@/pages/resources";
 import Settings from "@/pages/settings";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 
@@ -72,6 +73,11 @@ function AppRouter() {
       <Route path="/businesses">
         <RequireAuth>
           <Businesses />
+        </RequireAuth>
+      </Route>
+      <Route path="/resources">
+        <RequireAuth>
+          <Resources />
         </RequireAuth>
       </Route>
       <Route path="/host">

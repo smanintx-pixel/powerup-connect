@@ -12,12 +12,18 @@ import {
 import { MAX_PHOTO_BYTES } from "../shared/event";
 import { hostEnabled, mintHostToken, HOST_NAME, HOST_MAX_SECONDS, HOST_CALLS_PER_HOUR, HOST_CALLS_PER_DAY } from "./host";
 import { z } from "zod";
-import type { User, PublicUser, Relation, ConnectionRequest, Business } from "../shared/schema";
+import type { User, PublicUser, Relation, ConnectionRequest, Business, Resource } from "../shared/schema";
+import resourceList from "../shared/resources.json";
 import businessList from "../shared/businesses.json";
 
 // Businesses flagged in the source list (possibly closed, moved or unconfirmed) stay out of the app.
 const BUSINESSES: Business[] = (businessList as Business[]).filter((b) => !b.needsCheck);
 const BUSINESS_SLUGS = new Set(BUSINESSES.map((b) => b.slug));
+
+// The business owner resource guide. Same rule: flagged entries stay out.
+const RESOURCES: Resource[] = (resourceList as Resource[]).filter((r) => !r.needsCheck);
+const RESOURCE_SLUGS = new Set(RESOURCES.map((r) => r.slug));
+const RESOURCE_PREFIX = "resource:";
 
 function parseList<T>(json: string | null | undefined): T[] {
   try {
@@ -311,6 +317,40 @@ export function registerRoutes(app: Express): void {
       } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Could not update your saved businesses." });
+      }
+    });
+  }
+
+  // ---------- BUSINESS OWNER RESOURCE GUIDE ----------
+
+  app.get("/api/resources", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    try {
+      const saved = (await storage.listSavedBusinessSlugs(user.id))
+        .filter((s) => s.startsWith(RESOURCE_PREFIX))
+        .map((s) => s.slice(RESOURCE_PREFIX.length))
+        .filter((s) => RESOURCE_SLUGS.has(s));
+      res.json({ resources: RESOURCES, saved });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not load the resource guide." });
+    }
+  });
+
+  for (const method of ["post", "delete"] as const) {
+    app[method]("/api/resources/:slug/save", async (req, res) => {
+      const user = await requireAuth(req);
+      if (!user) return res.status(401).json({ message: "Not logged in." });
+      const slug = String(req.params.slug);
+      if (!RESOURCE_SLUGS.has(slug)) return res.status(404).json({ message: "Resource not found." });
+      try {
+        if (method === "post") await storage.saveBusiness(user.id, RESOURCE_PREFIX + slug);
+        else await storage.unsaveBusiness(user.id, RESOURCE_PREFIX + slug);
+        res.json({ saved: method === "post" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Could not update your saved resources." });
       }
     });
   }

@@ -177,7 +177,7 @@ export default function Home() {
     {
       icon: Store,
       title: "Businesses",
-      body: "Black-owned businesses across Northern Virginia. Find a place to eat, shop or book, and save your favorites.",
+      body: "Black-owned businesses across Northern Virginia to eat, shop and book, plus a guide to free help, funding and chambers for business owners.",
       href: "/businesses",
     },
   ];

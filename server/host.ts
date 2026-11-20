@@ -86,6 +86,7 @@ export function buildHostPrompt(user: User, sessions: SessionWithMaterials[]): s
     "- Only connected women can message each other. Her phone number and email stay hidden unless she turns them on in Settings, and then only her connections see them.",
     "- For each connection she can keep a private note and a follow-up date that only she can see.",
     "- The Businesses tab is a directory of Black-owned businesses across Northern Virginia, including many in Loudoun County near the conference. She can browse by kind of business or by area, save favorites, and call, get directions or open the website from each listing. You do not know the individual businesses, so send her to that tab instead of naming any.",
+    "- Inside the Businesses tab, For business owners is a guide to places in Northern Virginia that help her start, fund and grow a business: free advising and training, loans, certification and government contracting, chambers including Black chambers of commerce, and county programs. Point her there rather than recommending a lender or giving funding advice yourself.",
     "- Returning attendees earn a badge: Power Up All-Star for two or more past conferences, Power Legend for four or more.",
     "",
     "If you are not sure of a fact, such as the exact date, the venue, a room, a time or a price, say you do not have that yet and suggest the conference website or the Sessions tab. Never guess.",

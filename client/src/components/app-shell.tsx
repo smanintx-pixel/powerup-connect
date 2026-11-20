@@ -17,6 +17,11 @@ const NAV_ITEMS = [
   { href: "/businesses", label: "Businesses", icon: Store },
 ];
 
+// The resource guide lives under the Businesses tab.
+function isActive(location: string, href: string) {
+  return location === href || (href === "/businesses" && location === "/resources");
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout, authedFetch } = useAuth();
@@ -49,7 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 px-3 space-y-1" data-testid="nav-desktop">
           {NAV_ITEMS.map((item) => {
-            const active = location === item.href;
+            const active = isActive(location, item.href);
             return (
               <Link
                 key={item.href}
@@ -141,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         data-testid="nav-mobile"
       >
         {NAV_ITEMS.map((item) => {
-          const active = location === item.href;
+          const active = isActive(location, item.href);
           return (
             <Link
               key={item.href}

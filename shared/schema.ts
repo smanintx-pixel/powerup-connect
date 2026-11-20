@@ -179,7 +179,27 @@ export type Business = {
   needsCheck: string; // non-empty = flagged in the list; hidden in the app
 };
 
-// Businesses an attendee saved for later.
+// An organization in the business owner resource guide (shared/resources.json).
+export type Resource = {
+  slug: string;
+  name: string;
+  category: string;
+  offer: string;
+  who: string;
+  cost: string;
+  costType: "free" | "low" | "membership" | "loan" | "fee";
+  address: string;
+  serviceArea: string;
+  areas: string[]; // counties or cities it is specific to; empty = regional or statewide
+  phone: string;
+  email: string;
+  website: string;
+  tags: string[]; // who it is made for, e.g. "Women", "Black-owned"
+  needsCheck: string; // non-empty = flagged in the list; hidden in the app
+};
+
+// Businesses and resources an attendee saved for later. Resources are stored
+// with a "resource:" prefix on the slug.
 export const businessSaves = connect.table("business_saves", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
