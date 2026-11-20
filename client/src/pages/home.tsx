@@ -5,7 +5,7 @@ import {
   Users,
   Heart,
   MessageCircle,
-  PlayCircle,
+  Presentation,
   UserRound,
   Check,
   ArrowRight,
@@ -156,10 +156,10 @@ export default function Home() {
       href: "/messages",
     },
     {
-      icon: PlayCircle,
-      title: "Recordings",
-      body: "Session recordings appear here after the conference.",
-      href: "/recordings",
+      icon: Presentation,
+      title: "Sessions",
+      body: "Each session with its recording and any presentations, handouts or guides.",
+      href: "/sessions",
     },
   ];
 

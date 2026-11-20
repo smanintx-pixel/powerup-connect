@@ -243,6 +243,19 @@ export function registerRoutes(app: Express): void {
     }
   });
 
+  // ---------- SESSIONS ----------
+
+  app.get("/api/sessions", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    try {
+      res.json({ sessions: await storage.listEventSessions() });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not load the sessions." });
+    }
+  });
+
   // ---------- DIRECTORY ----------
 
   app.get("/api/directory", async (req, res) => {

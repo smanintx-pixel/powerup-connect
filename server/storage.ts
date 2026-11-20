@@ -5,7 +5,10 @@ import {
   messages,
   sessions,
   userPhotos,
+  eventSessions,
+  sessionMaterials,
   type UserPhoto,
+  type SessionWithMaterials,
   type AccessCode,
   type InsertAccessCode,
   type User,
@@ -44,6 +47,9 @@ export interface IStorage {
   setUserPhoto(userId: number, key: string, mime: string, data: string): Promise<void>;
   getPhotoByKey(key: string): Promise<UserPhoto | undefined>;
   deleteUserPhoto(userId: number): Promise<void>;
+
+  // Conference sessions, with their recording link and materials
+  listEventSessions(): Promise<SessionWithMaterials[]>;
 
   // Sign-in sessions
   createSession(tokenHash: string, userId: number, expiresAt: number): Promise<void>;
@@ -184,6 +190,19 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUserPhoto(userId: number) {
     await getDb().delete(userPhotos).where(eq(userPhotos.userId, userId));
+  }
+
+  async listEventSessions() {
+    const rows = await getDb()
+      .select()
+      .from(eventSessions)
+      .where(eq(eventSessions.published, true))
+      .orderBy(eventSessions.sortOrder, eventSessions.id);
+    const materials = await getDb()
+      .select()
+      .from(sessionMaterials)
+      .orderBy(sessionMaterials.sortOrder, sessionMaterials.id);
+    return rows.map((row) => ({ ...row, materials: materials.filter((m) => m.sessionId === row.id) }));
   }
 
   async createSession(tokenHash: string, userId: number, expiresAt: number) {

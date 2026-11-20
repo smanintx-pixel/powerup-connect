@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { House, Users, Heart, MessageCircle, PlayCircle, Settings, LogOut } from "lucide-react";
+import { House, Users, Heart, MessageCircle, Presentation, Settings, LogOut } from "lucide-react";
 import { Logo, Wordmark } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { href: "/directory", label: "Directory", icon: Users },
   { href: "/connections", label: "Connections", icon: Heart },
   { href: "/messages", label: "Messages", icon: MessageCircle },
-  { href: "/recordings", label: "Recordings", icon: PlayCircle },
+  { href: "/sessions", label: "Sessions", icon: Presentation },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

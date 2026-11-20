@@ -16,7 +16,7 @@ import AttendeeProfile from "@/pages/attendee-profile";
 import Connections from "@/pages/connections";
 import Messages from "@/pages/messages";
 import MessageThread from "@/pages/message-thread";
-import Recordings from "@/pages/recordings";
+import Sessions from "@/pages/sessions";
 import Settings from "@/pages/settings";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { ThemeProvider } from "@/lib/theme-context";
@@ -90,10 +90,13 @@ function AppRouter() {
           <MessageThread />
         </RequireAuth>
       </Route>
-      <Route path="/recordings">
+      <Route path="/sessions">
         <RequireAuth>
-          <Recordings />
+          <Sessions />
         </RequireAuth>
+      </Route>
+      <Route path="/recordings">
+        <Redirect to="/sessions" />
       </Route>
       <Route path="/settings">
         <RequireAuth>

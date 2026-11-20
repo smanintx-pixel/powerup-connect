@@ -136,3 +136,33 @@ export const sessions = connect.table("sessions", {
   expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
 }, (t) => [index("sessions_user_idx").on(t.userId)]);
 export type Session = typeof sessions.$inferSelect;
+
+// Conference sessions shown on the Sessions page. Named event_sessions so it
+// is not confused with the sign-in "sessions" table above.
+export const eventSessions = connect.table("event_sessions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  presenter: text("presenter").notNull().default(""),
+  track: text("track").notNull().default(""), // e.g. "Workshop", "Reception"
+  timeLabel: text("time_label").notNull().default(""), // free text, e.g. "12:00 to 4:00"
+  description: text("description").notNull().default(""),
+  recordingUrl: text("recording_url").notNull().default(""), // empty until the recording is posted
+  sortOrder: integer("sort_order").notNull().default(0),
+  published: boolean("published").notNull().default(true),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type EventSession = typeof eventSessions.$inferSelect;
+
+// Slides, handouts and guides that go with a session. Each one is a link.
+export const MATERIAL_KINDS = ["slides", "handout", "guide", "link"] as const;
+export const sessionMaterials = connect.table("session_materials", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull(),
+  title: text("title").notNull(),
+  kind: text("kind").notNull().default("handout"), // one of MATERIAL_KINDS
+  url: text("url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+}, (t) => [index("session_materials_session_idx").on(t.sessionId)]);
+export type SessionMaterial = typeof sessionMaterials.$inferSelect;
+
+export type SessionWithMaterials = EventSession & { materials: SessionMaterial[] };
