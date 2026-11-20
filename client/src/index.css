@@ -397,4 +397,73 @@
 @media (prefers-reduced-motion: no-preference) {
   @keyframes pu-float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(10px, -14px); } }
   .pu-float { animation: pu-float 12s ease-in-out infinite; }
+  .pu-float-slow { animation: pu-float 17s ease-in-out -6s infinite reverse; }
+
+  /* Home page motion. Everything in this block is skipped when the device asks for reduced motion. */
+
+  /* Soft colour drifting behind the hero gradient */
+  .pu-aurora { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .pu-aurora::before,
+  .pu-aurora::after {
+    content: ''; position: absolute; border-radius: 9999px; filter: blur(48px); will-change: transform;
+  }
+  .pu-aurora::before {
+    width: 60%; height: 120%; left: -15%; top: -40%;
+    background: radial-gradient(closest-side, rgba(255, 201, 51, 0.38), rgba(255, 201, 51, 0));
+    animation: pu-aurora-a 18s ease-in-out infinite alternate;
+  }
+  .pu-aurora::after {
+    width: 55%; height: 110%; right: -10%; bottom: -55%;
+    background: radial-gradient(closest-side, rgba(2, 175, 239, 0.40), rgba(2, 175, 239, 0));
+    animation: pu-aurora-b 22s ease-in-out infinite alternate;
+  }
+  @keyframes pu-aurora-a { from { transform: translate(0, 0) scale(1); } to { transform: translate(38%, 22%) scale(1.25); } }
+  @keyframes pu-aurora-b { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-42%, -26%) scale(0.9); } }
+
+  /* Hero lines rise in on load */
+  /* Uses the separate `translate` property so it never overrides an element's own rotate or scale. */
+  @keyframes pu-rise-in { from { opacity: 0; translate: 0 18px; } to { opacity: 1; translate: 0 0; } }
+  .pu-rise-now { animation: pu-rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i, 0) * 110ms); }
+
+  /* Hero sentence: words blur into focus */
+  @keyframes pu-blur-in { from { opacity: 0; filter: blur(8px); transform: translateY(6px); } to { opacity: 1; filter: blur(0); transform: none; } }
+  .pu-blur-word {
+    display: inline-block;
+    animation: pu-blur-in 0.5s ease-out both;
+    animation-delay: calc(260ms + var(--i, 0) * 32ms);
+  }
+
+  /* Blocks rise in, one after another, when their section scrolls into view */
+  .pu-reveal .pu-rise {
+    opacity: 0; transform: translateY(18px);
+    transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 80ms);
+  }
+  .pu-reveal.pu-in .pu-rise { opacity: 1; transform: none; }
+
+  /* Gold button: slow glow with a sheen passing over it */
+  @keyframes pu-glow {
+    0%, 100% { box-shadow: 0 12px 26px -8px rgba(255, 138, 0, 0.55), inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 0 0 0 rgba(255, 210, 63, 0.55); }
+    50% { box-shadow: 0 12px 30px -6px rgba(255, 138, 0, 0.7), inset 0 2px 0 rgba(255, 255, 255, 0.7), 0 0 0 9px rgba(255, 210, 63, 0); }
+  }
+  @keyframes pu-sheen { 0%, 62% { transform: translateX(-160%) skewX(-20deg); } 100% { transform: translateX(360%) skewX(-20deg); } }
+  .pu-glow { position: relative; overflow: hidden; animation: pu-glow 2.8s ease-in-out infinite; }
+  .pu-glow::before {
+    content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 38%; pointer-events: none;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0));
+    animation: pu-sheen 4.2s ease-in-out 1.2s infinite both;
+  }
+
+  /* Tiles lift a little under the pointer or a tap */
+  .pu-lift { transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease; }
+  .pu-lift:hover { transform: translateY(-4px) rotate(-0.6deg); }
+  .pu-lift:active { transform: translateY(-1px) scale(0.985); }
+
+  /* The step you are on gets a quiet pulse */
+  @keyframes pu-pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(138, 43, 226, 0.45); } 100% { box-shadow: 0 0 0 10px rgba(138, 43, 226, 0); } }
+  .pu-pulse { animation: pu-pulse-ring 1.8s ease-out infinite; }
+
+  /* A finished step's tick pops in */
+  @keyframes pu-pop { 0% { transform: scale(0.4); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+  .pu-reveal.pu-in .pu-pop { animation: pu-pop 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(200ms + var(--i, 0) * 80ms); }
 }

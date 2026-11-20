@@ -11,6 +11,7 @@ Express + Vite + React + Tailwind + shadcn/ui + Drizzle ORM (Postgres on Supabas
 - Profile photos: resized in the browser, stored in connect.user_photos, served from /api/photos/<random key>.
 - Privacy: other attendees never receive an email address or access code, and receive a phone number only when its owner turned "show on my profile" on (toAttendeeView in server/routes.ts).
 - Sessions page: rows in connect.event_sessions (title, presenter, track, time_label, description, recording_url, sort_order, published) and connect.session_materials (session_id, title, kind = slides | handout | guide | link, url). There is no organizer screen yet; rows are added in Supabase. A YouTube recording_url plays inside the app; any other link opens in a new tab.
+- Home page motion: client/src/components/motion.tsx (Reveal, CountUp, BlurWords) plus the pu-* animation classes at the end of client/src/index.css. CSS only, no animation library; all of it sits inside a prefers-reduced-motion: no-preference block.
 - API routes: server/routes.ts; storage layer: server/storage.ts
 - Pages: client/src/pages; routing uses wouter hash routing (useHashLocation)
 

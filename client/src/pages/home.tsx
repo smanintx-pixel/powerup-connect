@@ -18,6 +18,7 @@ import { InitialsAvatar } from "@/components/initials-avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { PowerBadge } from "@/components/power-badge";
+import { Reveal, CountUp, BlurWords, stagger } from "@/components/motion";
 import type { PublicUser, Connection, Message } from "@shared/schema";
 
 type ConnectionWithUser = Connection & { user: PublicUser };
@@ -167,23 +168,24 @@ export default function Home() {
     <AppShell>
       {/* Welcome */}
       <section className="pu-hero relative overflow-hidden text-white" data-testid="section-home-hero">
+        <span className="pu-aurora" aria-hidden="true" />
         <span className="pu-ring pu-float" style={{ width: 220, height: 220, borderWidth: 28, borderColor: "#FFC933", right: -110, top: -120, opacity: 0.9 }} />
-        <span className="pu-ring" style={{ width: 120, height: 120, borderWidth: 16, borderColor: "#02AFEF", right: 110, bottom: -60, opacity: 0.75 }} />
+        <span className="pu-ring pu-float-slow" style={{ width: 120, height: 120, borderWidth: 16, borderColor: "#02AFEF", right: 110, bottom: -60, opacity: 0.75 }} />
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-16 md:pt-12 md:pb-20">
-          <p className="font-script text-2xl md:text-3xl text-[#FFD23F] -rotate-2 inline-block mb-1">
+          <p className="font-script text-2xl md:text-3xl text-[#FFD23F] -rotate-2 inline-block mb-1 pu-rise-now">
             You&rsquo;re in the room
           </p>
-          <h1 className="text-3xl md:text-5xl font-extrabold leading-tight tracking-tight" data-testid="text-home-welcome">
+          <h1 className="text-3xl md:text-5xl font-extrabold leading-tight tracking-tight pu-rise-now" style={stagger(1)} data-testid="text-home-welcome">
             Welcome, {user ? firstName(user.name) : "there"}.
           </h1>
-          <PowerBadge pastYears={user?.pastYears} className="mt-2 text-xs px-3 py-1.5 shadow-md" />
-          <p className="mt-3 max-w-xl text-base md:text-lg text-white/90 leading-relaxed">
-            PowerUp Connect keeps the women you meet at Power Up within reach. Find her, save what
-            you talked about, and follow up long after the day ends.
-          </p>
+          <PowerBadge pastYears={user?.pastYears} className="mt-2 text-xs px-3 py-1.5 shadow-md pu-rise-now" />
+          <BlurWords
+            className="mt-3 max-w-xl text-base md:text-lg text-white/90 leading-relaxed"
+            text="PowerUp Connect keeps the women you meet at Power Up within reach. Find her, save what you talked about, and follow up long after the day ends."
+          />
           {nextStep && loaded && (
             <Link href={nextStep.href}>
-              <Button variant="gold" size="lg" className="mt-6" data-testid="button-home-next-step">
+              <Button variant="gold" size="lg" className="mt-6 pu-glow" data-testid="button-home-next-step">
                 {nextStep.title}
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -197,32 +199,32 @@ export default function Home() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-10 space-y-10">
         {/* At a glance */}
-        <section aria-label="At a glance" className="grid grid-cols-3 gap-3 md:gap-4 -mt-2">
-          {stats.map((s) => (
-            <Link key={s.href} href={s.href} className="block min-w-0">
+        <Reveal as="section" aria-label="At a glance" className="grid grid-cols-3 gap-3 md:gap-4 -mt-2">
+          {stats.map((s, i) => (
+            <Link key={s.href} href={s.href} className="block min-w-0 pu-rise" style={stagger(i)}>
               <div
-                className={`${s.tone} ${s.shape} text-white p-4 md:p-5 h-full hover-elevate active-elevate-2 shadow-md`}
+                className={`${s.tone} ${s.shape} text-white p-4 md:p-5 h-full hover-elevate active-elevate-2 shadow-md pu-lift`}
                 data-testid={`stat-${s.href.slice(1)}`}
               >
                 <p className="text-3xl md:text-4xl font-extrabold leading-none">
-                  {s.value === undefined ? "–" : s.value}
+                  {s.value === undefined ? "–" : <CountUp value={s.value} />}
                 </p>
                 <p className="mt-1.5 text-xs md:text-sm font-semibold text-white/90 leading-snug">{s.label}</p>
               </div>
             </Link>
           ))}
-        </section>
+        </Reveal>
 
         {/* Follow-ups */}
         {followUps.length > 0 && (
-          <section aria-labelledby="home-followups">
-            <h2 id="home-followups" className="text-lg font-extrabold mb-3 flex items-center gap-2">
+          <Reveal as="section" aria-labelledby="home-followups">
+            <h2 id="home-followups" className="text-lg font-extrabold mb-3 flex items-center gap-2 pu-rise">
               <Calendar className="h-5 w-5 text-primary" />
               Follow-ups coming up
             </h2>
             <ul className="space-y-2.5" role="list">
-              {followUps.slice(0, 3).map(({ conn, days }) => (
-                <li key={conn.id}>
+              {followUps.slice(0, 3).map(({ conn, days }, i) => (
+                <li key={conn.id} className="pu-rise" style={stagger(i + 1)}>
                   <Link href={`/attendee/${conn.user.id}`} className="block min-w-0">
                     <div className="rounded-xl border border-card-border bg-card p-4 flex items-center gap-3 hover-elevate active-elevate-2" data-testid={`followup-${conn.user.id}`}>
                       <InitialsAvatar name={conn.user.name} photoUrl={conn.user.photoUrl} className="h-10 w-10 shrink-0" />
@@ -243,13 +245,13 @@ export default function Home() {
                 See all {followUps.length} follow-ups
               </Link>
             )}
-          </section>
+          </Reveal>
         )}
 
         {/* Getting started */}
         {!allDone && (
-          <section aria-labelledby="home-start">
-            <div className="flex items-baseline justify-between gap-3 mb-3">
+          <Reveal as="section" aria-labelledby="home-start">
+            <div className="flex items-baseline justify-between gap-3 mb-3 pu-rise">
               <h2 id="home-start" className="text-lg font-extrabold">Get started</h2>
               {loaded && (
                 <span className="text-sm font-semibold text-muted-foreground" data-testid="text-home-progress">
@@ -259,7 +261,7 @@ export default function Home() {
             </div>
             <ol className="space-y-2.5" role="list">
               {steps.map((step, i) => (
-                <li key={step.key}>
+                <li key={step.key} className="pu-rise" style={stagger(i + 1)}>
                   <div
                     className={`rounded-xl border p-4 flex items-start gap-3 ${
                       step.done ? "border-card-border bg-muted/50" : "border-card-border bg-card"
@@ -268,8 +270,9 @@ export default function Home() {
                   >
                     <span
                       className={`shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-sm font-extrabold ${
-                        step.done ? "pu-green text-white" : "pu-purple text-white"
-                      }`}
+                        step.done ? "pu-green text-white pu-pop" : "pu-purple text-white"
+                      } ${loaded && step.key === nextStep?.key ? "pu-pulse" : ""}`}
+                      style={stagger(i + 1)}
                       aria-hidden="true"
                     >
                       {step.done ? <Check className="h-4 w-4" /> : i + 1}
@@ -292,16 +295,16 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-          </section>
+          </Reveal>
         )}
 
         {/* What's here */}
-        <section aria-labelledby="home-guide">
-          <h2 id="home-guide" className="text-lg font-extrabold mb-3">What&rsquo;s in the app</h2>
+        <Reveal as="section" aria-labelledby="home-guide">
+          <h2 id="home-guide" className="text-lg font-extrabold mb-3 pu-rise">What&rsquo;s in the app</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             {guide.map((g, i) => (
-              <Link key={g.title} href={g.href} className="block min-w-0">
-                <div className={`pu-card-tint pu-shape-${i % 4} border border-card-border p-5 h-full hover-elevate active-elevate-2`} data-testid={`guide-${g.title.toLowerCase()}`}>
+              <Link key={g.title} href={g.href} className="block min-w-0 pu-rise" style={stagger(i + 1)}>
+                <div className={`pu-card-tint pu-shape-${i % 4} border border-card-border p-5 h-full hover-elevate active-elevate-2 pu-lift`} data-testid={`guide-${g.title.toLowerCase()}`}>
                   <div className="flex items-center gap-2.5 mb-1.5">
                     <g.icon className="h-5 w-5 text-primary" />
                     <h3 className="text-base font-bold">{g.title}</h3>
@@ -311,10 +314,11 @@ export default function Home() {
               </Link>
             ))}
           </div>
-        </section>
+        </Reveal>
 
         {/* Good to know */}
-        <section aria-labelledby="home-know" className="rounded-2xl border border-card-border bg-card p-5">
+        <Reveal as="section" aria-labelledby="home-know">
+          <div className="rounded-2xl border border-card-border bg-card p-5 pu-rise">
           <h2 id="home-know" className="text-base font-extrabold mb-3">Good to know</h2>
           <ul className="space-y-3 text-sm text-muted-foreground" role="list">
             <li className="flex gap-3">
@@ -330,7 +334,8 @@ export default function Home() {
               <span>Other attendees see your photo, name, title, company, bio, tags, what you are here for and your LinkedIn link. Your email stays hidden, and your phone number shows only if you turn that on.</span>
             </li>
           </ul>
-        </section>
+          </div>
+        </Reveal>
       </div>
     </AppShell>
   );
