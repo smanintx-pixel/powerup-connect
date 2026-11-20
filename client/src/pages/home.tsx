@@ -14,6 +14,7 @@ import {
   Ticket,
   Sparkles,
   Store,
+  Briefcase,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -177,8 +178,14 @@ export default function Home() {
     {
       icon: Store,
       title: "Businesses",
-      body: "Black-owned businesses across Northern Virginia to eat, shop and book, plus a guide to free help, funding and chambers for business owners.",
+      body: "Black-owned businesses across Northern Virginia. Find a place to eat, shop or book, and save your favorites.",
       href: "/businesses",
+    },
+    {
+      icon: Briefcase,
+      title: "Resources",
+      body: "For business owners: free advice, funding, certification and chambers in Northern Virginia, found by what you need.",
+      href: "/resources",
     },
   ];
 

@@ -22,7 +22,6 @@ import { AppShell } from "@/components/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Reveal, stagger } from "@/components/motion";
-import { BusinessTabs } from "@/components/business-tabs";
 import { useAuth } from "@/lib/auth-context";
 import type { Business } from "@shared/schema";
 
@@ -264,7 +263,6 @@ export default function Businesses() {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10 space-y-8">
-        <BusinessTabs current="shop" />
         {isLoading ? (
           <div className="grid sm:grid-cols-2 gap-4 pt-2" data-testid="skeleton-businesses">
             {Array.from({ length: 4 }).map((_, i) => (

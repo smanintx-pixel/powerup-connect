@@ -1,25 +1,26 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { House, Users, Heart, MessageCircle, Presentation, Store, Settings, LogOut } from "lucide-react";
+import { House, Users, Heart, MessageCircle, Presentation, Store, Briefcase, Settings, LogOut } from "lucide-react";
 import { Logo, Wordmark } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
 import { InitialsAvatar } from "@/components/initials-avatar";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
+// `short` is the label on the phone's bottom bar, where seven tabs share the width.
 const NAV_ITEMS = [
-  { href: "/home", label: "Home", icon: House },
-  { href: "/directory", label: "Directory", icon: Users },
-  { href: "/connections", label: "Connections", icon: Heart },
-  { href: "/messages", label: "Messages", icon: MessageCircle },
-  { href: "/sessions", label: "Sessions", icon: Presentation },
-  { href: "/businesses", label: "Businesses", icon: Store },
+  { href: "/home", label: "Home", short: "Home", icon: House },
+  { href: "/directory", label: "Directory", short: "Directory", icon: Users },
+  { href: "/connections", label: "Connections", short: "Connect", icon: Heart },
+  { href: "/messages", label: "Messages", short: "Messages", icon: MessageCircle },
+  { href: "/sessions", label: "Sessions", short: "Sessions", icon: Presentation },
+  { href: "/businesses", label: "Businesses", short: "Shop", icon: Store },
+  { href: "/resources", label: "Resources", short: "Resources", icon: Briefcase },
 ];
 
-// The resource guide lives under the Businesses tab.
 function isActive(location: string, href: string) {
-  return location === href || (href === "/businesses" && location === "/resources");
+  return location === href;
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -141,7 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom tab nav */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border grid grid-cols-6 shadow-[0_-10px_24px_-14px_rgba(106,33,196,0.35)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border grid grid-cols-7 shadow-[0_-10px_24px_-14px_rgba(106,33,196,0.35)]"
         aria-label="Main navigation"
         data-testid="nav-mobile"
       >
@@ -157,7 +158,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               }`}
             >
               <item.icon className="h-5 w-5" />
-              <span className="text-[10px] min-[420px]:text-[11px] font-semibold leading-none tracking-tight">{item.label}</span>
+              <span className="text-[10px] min-[440px]:text-[11px] font-semibold leading-none tracking-tight" aria-hidden="true">{item.short}</span>
+              <span className="sr-only">{item.label}</span>
               {badgeFor(item.href) > 0 && (
                 <span className="absolute top-1.5 left-1/2 ml-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FFC933] text-[#0B1440] text-[10px] font-extrabold flex items-center justify-center" data-testid="badge-requests-mobile">
                   {badgeFor(item.href)}

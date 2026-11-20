@@ -20,7 +20,6 @@ import { AppShell } from "@/components/app-shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Reveal, stagger } from "@/components/motion";
-import { BusinessTabs } from "@/components/business-tabs";
 import { useAuth } from "@/lib/auth-context";
 import type { Resource } from "@shared/schema";
 
@@ -263,7 +262,7 @@ export default function Resources() {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-8 pb-14 md:pt-10 md:pb-16">
           <p className="font-script text-2xl md:text-3xl text-[#FFD23F] -rotate-2 inline-block mb-1 pu-rise-now">For business owners</p>
           <h1 className="text-3xl md:text-4xl font-extrabold leading-tight tracking-tight pu-rise-now" style={stagger(1)}>
-            Business owner resource guide
+            Business resource guide
           </h1>
           <p className="mt-2 max-w-xl text-base text-white/90 leading-relaxed pu-rise-now" style={stagger(2)}>
             {all.length > 0 ? `${all.length} places` : "Places"} in Northern Virginia that help you start, fund and grow a business. Many
@@ -276,8 +275,6 @@ export default function Resources() {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-10 space-y-8">
-        <BusinessTabs current="owners" />
-
         {isLoading ? (
           <div className="grid sm:grid-cols-2 gap-4" data-testid="skeleton-resources">
             {Array.from({ length: 4 }).map((_, i) => (
