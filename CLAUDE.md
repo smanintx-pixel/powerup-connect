@@ -6,7 +6,7 @@ Full product spec: powerup_connect_spec.md. Branding: BRANDING.md (matches the P
 ## Stack
 Express + Vite + React + Tailwind + shadcn/ui + Drizzle ORM (Postgres on Supabase via postgres-js).
 - Hosting: Netlify. Screens are static; the API is one Netlify Function (netlify/functions/api.ts wrapping server/app.ts). See DEPLOY.md.
-- Database: Supabase project "power-up", schema `connect`; needs DATABASE_URL (see .env.example).
+- Database: Supabase project "power-up", schema `connect`; needs DATABASE_URL (see .env.example). On Netlify, server/db.ts opens a new connection whenever the last one has been unused for 8 seconds (a connection that sat through a function freeze can hang), and server/app.ts answers 503 and resets the connections if any request takes 20 seconds.
 - Data model: shared/schema.ts. Conference years, the five "I'm here for" interests and the All-Star / Legend badge rule live in shared/event.ts (no database imports, safe for the browser).
 - Profile photos: resized in the browser, stored in connect.user_photos, served from /api/photos/<random key>.
 - Connections need consent: connect.connection_requests holds one row per direction (pending | accepted | declined). Two women are connected once a row between them is accepted. A declined request is kept and still reads as "request sent" to the sender, so she is not told and cannot ask again. Asking someone who already asked you connects straight away. 40 new requests per account per day. Private notes stay in connect.connections and need an accepted connection.

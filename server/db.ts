@@ -20,9 +20,31 @@ export function toReachableUrl(url: string): string {
     .replace(/^(postgres(?:ql)?:\/\/)postgres:/i, `$1postgres.${ref}:`);
 }
 
-// One shared connection pool per running copy of the server. On Netlify each
-// function instance keeps a single connection to Supabase's transaction pooler.
+type Sql = ReturnType<typeof postgres>;
+let client: Sql | undefined;
+let lastUsed = 0;
+
+const serverless = Boolean(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+// A Netlify Function is frozen between requests. A connection that sat through
+// a freeze can be dead without the driver knowing, and a query sent down it
+// never returns. So on Netlify a connection that has not been used for a few
+// seconds is thrown away and a new one is opened (cheap through the pooler).
+const STALE_AFTER_MS = 8000;
+
+/** Drops the current connections. The next query opens fresh ones. */
+export function resetDb(): void {
+  const old = client;
+  client = undefined;
+  cached = undefined;
+  if (old) old.end({ timeout: 0 }).catch(() => {});
+}
+
+// One shared connection pool per running copy of the server.
 export function getDb(): PostgresJsDatabase {
+  const now = Date.now();
+  if (cached && serverless && now - lastUsed > STALE_AFTER_MS) resetDb();
+  lastUsed = now;
   if (cached) return cached;
   const raw = process.env.DATABASE_URL?.trim();
   if (!raw) {
@@ -30,10 +52,11 @@ export function getDb(): PostgresJsDatabase {
   }
   const url = toReachableUrl(raw);
   const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
-  const serverless = Boolean(process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  const client = postgres(url, {
+  client = postgres(url, {
     prepare: false, // required by Supabase's transaction pooler
-    max: serverless ? 1 : 5,
+    // A few connections, so queries a route runs side by side each get their
+    // own instead of being stacked on one.
+    max: serverless ? 3 : 5,
     idle_timeout: 20,
     connect_timeout: 10,
     ssl: isLocal ? false : "require",
