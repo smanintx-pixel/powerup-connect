@@ -460,6 +460,39 @@
   @keyframes pu-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
   .pu-bob { animation: pu-bob 6s ease-in-out infinite; animation-delay: calc(1200ms + var(--i, 0) * 900ms); }
 
+  /* App logo: the power button switches on, then keeps a soft green glow */
+  .pu-logo::before {
+    content: ''; position: absolute; inset: -18%; border-radius: 9999px; pointer-events: none;
+    background: radial-gradient(closest-side, rgba(112, 192, 64, 0.55), rgba(112, 192, 64, 0) 72%);
+    opacity: 0; animation: pu-logo-glow 4.5s ease-in-out 1s infinite;
+  }
+  @keyframes pu-logo-glow { 0%, 55%, 100% { opacity: 0; scale: 0.85; } 22% { opacity: 1; scale: 1.12; } }
+  .pu-logo-intro img { animation: pu-logo-on 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes pu-logo-on {
+    0% { opacity: 0; rotate: -200deg; scale: 0.35; filter: grayscale(1) brightness(0.8); }
+    60% { opacity: 1; rotate: 12deg; scale: 1.12; filter: grayscale(0.2) brightness(1.1); }
+    100% { opacity: 1; rotate: 0deg; scale: 1; filter: none; }
+  }
+  .pu-logo img { transition: rotate 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), scale 0.2s ease; }
+  a:hover .pu-logo img, .pu-logo:hover img { rotate: 25deg; }
+  a:active .pu-logo img { scale: 0.9; }
+
+  /* Wordmark: slides in beside the button, then a shine passes over "Connect" now and then */
+  .pu-word-intro { animation: pu-word-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s both; }
+  .pu-word-intro-2 { animation-delay: 0.5s; }
+  @keyframes pu-word-in { from { opacity: 0; translate: -10px 0; } to { opacity: 1; translate: 0 0; } }
+  @supports (-webkit-background-clip: text) or (background-clip: text) {
+    .pu-word-shine, .pu-word-shine-gold {
+      background-size: 250% 100%; background-position: 100% 0;
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .pu-word-shine { background-image: linear-gradient(100deg, hsl(var(--primary)) 0%, hsl(var(--primary)) 42%, #FFC933 50%, hsl(var(--primary)) 58%, hsl(var(--primary)) 100%); }
+    .pu-word-shine-gold { background-image: linear-gradient(100deg, #FFD23F 0%, #FFD23F 42%, #FFFFFF 50%, #FFD23F 58%, #FFD23F 100%); }
+    .pu-word-shine, .pu-word-shine-gold { animation: pu-word-shine 6s ease-in-out 1.6s infinite; }
+    .pu-word-intro.pu-word-shine, .pu-word-intro.pu-word-shine-gold { animation: pu-word-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) 0.5s both, pu-word-shine 6s ease-in-out 1.6s infinite; }
+  }
+  @keyframes pu-word-shine { 0%, 70% { background-position: 100% 0; } 100% { background-position: 0% 0; } }
+
   /* Tiles lift a little under the pointer or a tap */
   .pu-lift { transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease; }
   .pu-lift:hover { transform: translateY(-4px) rotate(-0.6deg); }
