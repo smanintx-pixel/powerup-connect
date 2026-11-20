@@ -13,6 +13,7 @@ import {
   Lock,
   Ticket,
   Sparkles,
+  Store,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -172,6 +173,12 @@ export default function Home() {
       title: "Sessions",
       body: "Each session with its recording and any presentations, handouts or guides.",
       href: "/sessions",
+    },
+    {
+      icon: Store,
+      title: "Businesses",
+      body: "Black-owned businesses across Northern Virginia. Find a place to eat, shop or book, and save your favorites.",
+      href: "/businesses",
     },
   ];
 

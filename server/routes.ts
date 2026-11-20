@@ -12,7 +12,12 @@ import {
 import { MAX_PHOTO_BYTES } from "../shared/event";
 import { hostEnabled, mintHostToken, HOST_NAME, HOST_MAX_SECONDS, HOST_CALLS_PER_HOUR, HOST_CALLS_PER_DAY } from "./host";
 import { z } from "zod";
-import type { User, PublicUser, Relation, ConnectionRequest } from "../shared/schema";
+import type { User, PublicUser, Relation, ConnectionRequest, Business } from "../shared/schema";
+import businessList from "../shared/businesses.json";
+
+// Businesses flagged in the source list (possibly closed, moved or unconfirmed) stay out of the app.
+const BUSINESSES: Business[] = (businessList as Business[]).filter((b) => !b.needsCheck);
+const BUSINESS_SLUGS = new Set(BUSINESSES.map((b) => b.slug));
 
 function parseList<T>(json: string | null | undefined): T[] {
   try {
@@ -278,6 +283,37 @@ export function registerRoutes(app: Express): void {
       res.status(500).json({ message: "Could not load the sessions." });
     }
   });
+
+  // ---------- BLACK-OWNED BUSINESS DIRECTORY ----------
+
+  app.get("/api/businesses", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    try {
+      const saved = (await storage.listSavedBusinessSlugs(user.id)).filter((s) => BUSINESS_SLUGS.has(s));
+      res.json({ businesses: BUSINESSES, saved });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not load the businesses." });
+    }
+  });
+
+  for (const method of ["post", "delete"] as const) {
+    app[method]("/api/businesses/:slug/save", async (req, res) => {
+      const user = await requireAuth(req);
+      if (!user) return res.status(401).json({ message: "Not logged in." });
+      const slug = String(req.params.slug);
+      if (!BUSINESS_SLUGS.has(slug)) return res.status(404).json({ message: "Business not found." });
+      try {
+        if (method === "post") await storage.saveBusiness(user.id, slug);
+        else await storage.unsaveBusiness(user.id, slug);
+        res.json({ saved: method === "post" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Could not update your saved businesses." });
+      }
+    });
+  }
 
   // ---------- AI HOST ----------
   // A live video persona (Nuance Labs). The API key never leaves the server:

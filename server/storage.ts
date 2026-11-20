@@ -4,6 +4,7 @@ import {
   connections,
   connectionRequests,
   hostCalls,
+  businessSaves,
   messages,
   sessions,
   userPhotos,
@@ -49,6 +50,11 @@ export interface IStorage {
   respondToRequest(userId: number, fromUserId: number, accept: boolean): Promise<boolean>;
   removeConnection(userId: number, otherUserId: number): Promise<void>;
   countRequestsSentSince(userId: number, since: number): Promise<number>;
+
+  // Saved businesses
+  listSavedBusinessSlugs(userId: number): Promise<string[]>;
+  saveBusiness(userId: number, slug: string): Promise<void>;
+  unsaveBusiness(userId: number, slug: string): Promise<void>;
 
   // AI host calls
   countHostCallsSince(userId: number, since: number): Promise<number>;
@@ -244,6 +250,23 @@ export class DatabaseStorage implements IStorage {
       .from(connectionRequests)
       .where(and(eq(connectionRequests.fromUserId, userId), gt(connectionRequests.createdAt, since)));
     return row?.n ?? 0;
+  }
+
+  async listSavedBusinessSlugs(userId: number) {
+    const rows = await getDb()
+      .select({ slug: businessSaves.slug })
+      .from(businessSaves)
+      .where(eq(businessSaves.userId, userId))
+      .orderBy(desc(businessSaves.createdAt));
+    return rows.map((r) => r.slug);
+  }
+
+  async saveBusiness(userId: number, slug: string) {
+    await getDb().insert(businessSaves).values({ userId, slug, createdAt: Date.now() }).onConflictDoNothing();
+  }
+
+  async unsaveBusiness(userId: number, slug: string) {
+    await getDb().delete(businessSaves).where(and(eq(businessSaves.userId, userId), eq(businessSaves.slug, slug)));
   }
 
   async countHostCallsSince(userId: number, since: number) {

@@ -160,6 +160,33 @@ export const hostCalls = connect.table("host_calls", {
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 }, (t) => [index("host_calls_user_idx").on(t.userId, t.createdAt)]);
 
+// A business in the Black-owned business directory (shared/businesses.json,
+// built from data/black-owned-businesses-nova.md by scripts/import-businesses.mjs).
+export type Business = {
+  slug: string;
+  name: string;
+  type: string;
+  category: string;
+  area: string; // "" when the list gives no county or city section
+  city: string;
+  specialty: string;
+  owner: string;
+  address: string;
+  addressNote: string;
+  phone: string;
+  email: string; // only where the business publishes one itself
+  website: string;
+  needsCheck: string; // non-empty = flagged in the list; hidden in the app
+};
+
+// Businesses an attendee saved for later.
+export const businessSaves = connect.table("business_saves", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  slug: text("slug").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => [uniqueIndex("business_saves_user_slug_idx").on(t.userId, t.slug)]);
+
 // Sign-in sessions. Only a SHA-256 hash of the token is stored, so a copy of this
 // table cannot be used to sign in as someone.
 export const sessions = connect.table("sessions", {

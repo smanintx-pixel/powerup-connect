@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { House, Users, Heart, MessageCircle, Presentation, Settings, LogOut } from "lucide-react";
+import { House, Users, Heart, MessageCircle, Presentation, Store, Settings, LogOut } from "lucide-react";
 import { Logo, Wordmark } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: "/connections", label: "Connections", icon: Heart },
   { href: "/messages", label: "Messages", icon: MessageCircle },
   { href: "/sessions", label: "Sessions", icon: Presentation },
+  { href: "/businesses", label: "Businesses", icon: Store },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -135,7 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom tab nav */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border grid grid-cols-5 shadow-[0_-10px_24px_-14px_rgba(106,33,196,0.35)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border grid grid-cols-6 shadow-[0_-10px_24px_-14px_rgba(106,33,196,0.35)]"
         aria-label="Main navigation"
         data-testid="nav-mobile"
       >
@@ -146,12 +147,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               key={item.href}
               href={item.href}
               data-testid={`link-nav-mobile-${item.label.toLowerCase()}`}
-              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] hover-elevate active-elevate-2 ${
+              className={`relative min-w-0 flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] hover-elevate active-elevate-2 ${
                 active ? "text-primary pu-tab-active" : "text-muted-foreground"
               }`}
             >
               <item.icon className="h-5 w-5" />
-              <span className="text-[11px] font-semibold leading-none">{item.label}</span>
+              <span className="text-[10px] min-[420px]:text-[11px] font-semibold leading-none tracking-tight">{item.label}</span>
               {badgeFor(item.href) > 0 && (
                 <span className="absolute top-1.5 left-1/2 ml-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FFC933] text-[#0B1440] text-[10px] font-extrabold flex items-center justify-center" data-testid="badge-requests-mobile">
                   {badgeFor(item.href)}
