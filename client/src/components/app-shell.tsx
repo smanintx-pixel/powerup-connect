@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { House, Users, Heart, MessageCircle, Presentation, Settings, LogOut } from "lucide-react";
 import { Logo, Wordmark } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
@@ -17,7 +18,22 @@ const NAV_ITEMS = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, authedFetch } = useAuth();
+  // Same query as the Connections page, so the two stay in step.
+  const { data: connData } = useQuery<{ incoming?: unknown[] }>({
+    queryKey: ["/api/connections"],
+    queryFn: async () => {
+      const res = await authedFetch("/api/connections");
+      if (!res.ok) throw new Error("Could not load connections.");
+      return res.json();
+    },
+    enabled: !!user,
+    // Fresh on every screen change and every 20 seconds, so a new request shows up promptly.
+    refetchOnMount: "always",
+    refetchInterval: 20000,
+  });
+  const requestCount = connData?.incoming?.length ?? 0;
+  const badgeFor = (href: string) => (href === "/connections" ? requestCount : 0);
 
   return (
     <div className="min-h-dvh flex flex-col md:flex-row bg-background">
@@ -46,6 +62,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <item.icon className="h-[18px] w-[18px]" />
                 {item.label}
+                {badgeFor(item.href) > 0 && (
+                  <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-[#FFC933] text-[#0B1440] text-[11px] font-extrabold flex items-center justify-center" data-testid="badge-requests">
+                    {badgeFor(item.href)}
+                    <span className="sr-only"> requests to connect</span>
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -124,12 +146,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               key={item.href}
               href={item.href}
               data-testid={`link-nav-mobile-${item.label.toLowerCase()}`}
-              className={`flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] hover-elevate active-elevate-2 ${
+              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] hover-elevate active-elevate-2 ${
                 active ? "text-primary pu-tab-active" : "text-muted-foreground"
               }`}
             >
               <item.icon className="h-5 w-5" />
               <span className="text-[11px] font-semibold leading-none">{item.label}</span>
+              {badgeFor(item.href) > 0 && (
+                <span className="absolute top-1.5 left-1/2 ml-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FFC933] text-[#0B1440] text-[10px] font-extrabold flex items-center justify-center" data-testid="badge-requests-mobile">
+                  {badgeFor(item.href)}
+                  <span className="sr-only"> requests to connect</span>
+                </span>
+              )}
             </Link>
           );
         })}

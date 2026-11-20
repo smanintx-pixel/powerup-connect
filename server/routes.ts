@@ -1,10 +1,9 @@
 import type { Express, Request } from "express";
-import { storage } from "./storage";
+import { storage, relationFrom } from "./storage";
 import { hashPassword, verifyPassword, createSession, getUserIdForToken, destroySession } from "./auth";
 import crypto from "node:crypto";
 import {
   insertUserSchema,
-  insertConnectionSchema,
   insertMessageSchema,
   phoneSchema,
   interestsSchema,
@@ -12,7 +11,7 @@ import {
 } from "../shared/schema";
 import { MAX_PHOTO_BYTES } from "../shared/event";
 import { z } from "zod";
-import type { User, PublicUser } from "../shared/schema";
+import type { User, PublicUser, Relation, ConnectionRequest } from "../shared/schema";
 
 function parseList<T>(json: string | null | undefined): T[] {
   try {
@@ -33,16 +32,37 @@ function toPublicUser(user: User): PublicUser {
   };
 }
 
-// What one attendee may see about another: the profile, never the email
-// address or the access code she signed up with, and her phone number only
-// if she chose to show it.
-function toAttendeeView(user: User): PublicUser {
+// What one attendee may see about another: the profile, never the access code
+// she signed up with. Her phone number and email address are included only if
+// she chose to show them AND she has accepted the viewer as a connection.
+function toAttendeeView(user: User, connected: boolean): PublicUser {
   return {
     ...toPublicUser(user),
-    email: "",
+    email: connected && user.emailVisible ? user.email : "",
     accessCode: "",
-    phone: user.phoneVisible ? user.phone : "",
+    phone: connected && user.phoneVisible ? user.phone : "",
   };
+}
+
+// Relation of the signed-in woman to everyone she has a request with, in one query.
+async function relationsFor(userId: number): Promise<Map<number, Relation>> {
+  const rows = await storage.listRequestsForUser(userId);
+  const byOther = new Map<number, ConnectionRequest[]>();
+  for (const r of rows) {
+    const other = r.fromUserId === userId ? r.toUserId : r.fromUserId;
+    byOther.set(other, [...(byOther.get(other) ?? []), r]);
+  }
+  const out = new Map<number, Relation>();
+  byOther.forEach((list, other) => out.set(other, relationFrom(userId, list)));
+  return out;
+}
+
+// A cap on new requests per day, so one account cannot spray the whole directory.
+const MAX_REQUESTS_PER_DAY = 40;
+
+function parseId(raw: string): number | null {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
 }
 
 // Accepts a browser data URL for a small JPEG, PNG or WebP and returns the
@@ -109,6 +129,7 @@ export function registerRoutes(app: Express): void {
         tags: JSON.stringify(parsed.tags ?? []),
         phone: parsed.phone ?? "",
         phoneVisible: parsed.phoneVisible ?? false,
+        emailVisible: parsed.emailVisible ?? false,
         interests: JSON.stringify(parsed.interests ?? []),
         pastYears: JSON.stringify(parsed.pastYears ?? []),
         accessCode: codeRow.code,
@@ -174,6 +195,7 @@ export function registerRoutes(app: Express): void {
       tags: z.array(z.string()).optional(),
       phone: phoneSchema.optional(),
       phoneVisible: z.boolean().optional(),
+      emailVisible: z.boolean().optional(),
       interests: interestsSchema.optional(),
       pastYears: pastYearsSchema.optional(),
     });
@@ -261,8 +283,10 @@ export function registerRoutes(app: Express): void {
   app.get("/api/directory", async (req, res) => {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
-    const all = await storage.listUsers(user.id);
-    res.json({ users: all.map(toAttendeeView) });
+    const [all, rel] = await Promise.all([storage.listUsers(user.id), relationsFor(user.id)]);
+    const relations: Record<number, Relation> = {};
+    rel.forEach((value, id) => { relations[id] = value; });
+    res.json({ users: all.map((u) => toAttendeeView(u, rel.get(u.id) === "connected")), relations });
   });
 
   app.get("/api/users/:id", async (req, res) => {
@@ -270,44 +294,151 @@ export function registerRoutes(app: Express): void {
     if (!user) return res.status(401).json({ message: "Not logged in." });
     const target = await storage.getUser(Number(req.params.id));
     if (!target) return res.status(404).json({ message: "Attendee not found." });
-    res.json({ user: toAttendeeView(target) });
+    const relation = target.id === user.id ? "none" : await storage.getRelation(user.id, target.id);
+    res.json({ user: toAttendeeView(target, relation === "connected"), relation });
   });
 
   // ---------- CONNECTIONS ----------
+  // A connection exists only after the other woman accepts a request.
 
   app.get("/api/connections", async (req, res) => {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
-    const conns = await storage.listConnectionsForUser(user.id);
-    const withUsers = await Promise.all(
-      conns.map(async (c) => {
-        const other = await storage.getUser(c.connectedUserId);
-        return { ...c, user: other ? toAttendeeView(other) : null };
-      })
-    );
-    res.json({ connections: withUsers.filter((c) => c.user !== null) });
+    try {
+      const [requests, notes] = await Promise.all([
+        storage.listRequestsForUser(user.id),
+        storage.listConnectionsForUser(user.id),
+      ]);
+      const rel = await relationsFor(user.id);
+      const noteByOther = new Map(notes.map((n) => [n.connectedUserId, n]));
+      const people = new Map<number, User | undefined>();
+      await Promise.all(
+        Array.from(rel.keys()).map(async (id) => { people.set(id, await storage.getUser(id)); })
+      );
+
+      const connections = [];
+      const incoming = [];
+      const outgoing = [];
+      for (const [otherId, relation] of Array.from(rel.entries())) {
+        const other = people.get(otherId);
+        if (!other) continue;
+        const rows = requests.filter((r) => r.fromUserId === otherId || r.toUserId === otherId);
+        if (relation === "connected") {
+          const accepted = rows.find((r) => r.status === "accepted")!;
+          // Notes are created the first time she writes one; until then send an empty one.
+          const note = noteByOther.get(otherId);
+          connections.push({
+            id: note?.id ?? -accepted.id,
+            userId: user.id,
+            connectedUserId: otherId,
+            note: note?.note ?? "",
+            reminderDate: note?.reminderDate ?? null,
+            createdAt: accepted.respondedAt ?? accepted.createdAt,
+            user: toAttendeeView(other, true),
+          });
+        } else if (relation === "incoming") {
+          const row = rows.find((r) => r.toUserId === user.id && r.status === "pending")!;
+          incoming.push({ id: row.id, createdAt: row.createdAt, user: toAttendeeView(other, false) });
+        } else if (relation === "outgoing") {
+          const row = rows.find((r) => r.fromUserId === user.id)!;
+          outgoing.push({ id: row.id, createdAt: row.createdAt, user: toAttendeeView(other, false) });
+        }
+      }
+      const newest = (a: { createdAt: number }, b: { createdAt: number }) => b.createdAt - a.createdAt;
+      res.json({
+        connections: connections.sort(newest),
+        incoming: incoming.sort(newest),
+        outgoing: outgoing.sort(newest),
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not load your connections." });
+    }
   });
 
   app.get("/api/connections/:connectedUserId", async (req, res) => {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
-    const conn = await storage.getConnection(user.id, Number(req.params.connectedUserId));
-    res.json({ connection: conn ?? null });
+    const otherId = parseId(req.params.connectedUserId);
+    if (!otherId) return res.json({ connection: null, relation: "none" });
+    const relation = await storage.getRelation(user.id, otherId);
+    const conn = relation === "connected" ? await storage.getConnection(user.id, otherId) : undefined;
+    res.json({ connection: conn ?? null, relation });
   });
 
+  // Ask to connect. If she had already asked, this connects the two straight away.
+  app.post("/api/connections/:connectedUserId/request", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    const otherId = parseId(req.params.connectedUserId);
+    if (!otherId || otherId === user.id) {
+      return res.status(400).json({ message: "You can't connect with yourself." });
+    }
+    const target = await storage.getUser(otherId);
+    if (!target) return res.status(404).json({ message: "Attendee not found." });
+    try {
+      const before = await storage.getRelation(user.id, otherId);
+      if (before === "none") {
+        const sent = await storage.countRequestsSentSince(user.id, Date.now() - 24 * 60 * 60 * 1000);
+        if (sent >= MAX_REQUESTS_PER_DAY) {
+          return res.status(429).json({ message: "You have sent a lot of requests today. Try again tomorrow." });
+        }
+      }
+      const relation = await storage.requestConnection(user.id, otherId);
+      res.json({ relation });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not send the request." });
+    }
+  });
+
+  for (const action of ["accept", "decline"] as const) {
+    app.post(`/api/connections/:connectedUserId/${action}`, async (req, res) => {
+      const user = await requireAuth(req);
+      if (!user) return res.status(401).json({ message: "Not logged in." });
+      const otherId = parseId(req.params.connectedUserId);
+      if (!otherId) return res.status(404).json({ message: "Request not found." });
+      try {
+        const ok = await storage.respondToRequest(user.id, otherId, action === "accept");
+        if (!ok) return res.status(404).json({ message: "That request is no longer waiting." });
+        res.json({ relation: await storage.getRelation(user.id, otherId) });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Could not update the request." });
+      }
+    });
+  }
+
+  // Remove a connection, or take back a request that has not been answered.
+  app.delete("/api/connections/:connectedUserId", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    const otherId = parseId(req.params.connectedUserId);
+    if (!otherId) return res.status(404).json({ message: "Attendee not found." });
+    try {
+      await storage.removeConnection(user.id, otherId);
+      res.json({ relation: await storage.getRelation(user.id, otherId) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not remove the connection." });
+    }
+  });
+
+  // Private note and follow-up date about a connection.
   app.post("/api/connections/:connectedUserId", async (req, res) => {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
-    const connectedUserId = Number(req.params.connectedUserId);
-    if (connectedUserId === user.id) {
+    const connectedUserId = parseId(req.params.connectedUserId);
+    if (!connectedUserId || connectedUserId === user.id) {
       return res.status(400).json({ message: "You can't connect with yourself." });
     }
-    const target = await storage.getUser(connectedUserId);
-    if (!target) return res.status(404).json({ message: "Attendee not found." });
+    if ((await storage.getRelation(user.id, connectedUserId)) !== "connected") {
+      return res.status(403).json({ message: "You can add notes once she accepts your request." });
+    }
 
     const schema = z.object({
-      note: z.string().optional(),
-      reminderDate: z.string().nullable().optional(),
+      note: z.string().max(4000).optional(),
+      reminderDate: z.string().max(10).nullable().optional(),
     });
     try {
       const parsed = schema.parse(req.body ?? {});
@@ -330,13 +461,14 @@ export function registerRoutes(app: Express): void {
     const otherIds = Array.from(
       new Set(all.map((m) => (m.senderId === user.id ? m.receiverId : m.senderId)))
     );
+    const rel = await relationsFor(user.id);
     const conversations = await Promise.all(
       otherIds.map(async (otherId) => {
         const other = await storage.getUser(otherId);
         const thread = all.filter((m) => m.senderId === otherId || m.receiverId === otherId);
         const last = thread.sort((a, b) => b.createdAt - a.createdAt)[0];
         return other
-          ? { user: toAttendeeView(other), lastMessage: last ?? null }
+          ? { user: toAttendeeView(other, rel.get(otherId) === "connected"), lastMessage: last ?? null }
           : null;
       })
     );
@@ -350,8 +482,11 @@ export function registerRoutes(app: Express): void {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
     const otherUserId = Number(req.params.otherUserId);
-    const thread = await storage.listConversation(user.id, otherUserId);
-    res.json({ messages: thread });
+    const [thread, relation] = await Promise.all([
+      storage.listConversation(user.id, otherUserId),
+      storage.getRelation(user.id, otherUserId),
+    ]);
+    res.json({ messages: thread, canMessage: relation === "connected", relation });
   });
 
   app.post("/api/messages/:otherUserId", async (req, res) => {
@@ -360,6 +495,10 @@ export function registerRoutes(app: Express): void {
     const otherUserId = Number(req.params.otherUserId);
     const target = await storage.getUser(otherUserId);
     if (!target) return res.status(404).json({ message: "Attendee not found." });
+    // Messages go only between women who have accepted each other.
+    if ((await storage.getRelation(user.id, otherUserId)) !== "connected") {
+      return res.status(403).json({ message: "You can message her once you are connected." });
+    }
     try {
       const parsed = insertMessageSchema.parse({
         senderId: user.id,

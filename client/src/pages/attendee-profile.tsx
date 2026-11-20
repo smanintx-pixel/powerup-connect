@@ -9,8 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
-import type { PublicUser, Connection } from "@shared/schema";
-import { ArrowLeft, ExternalLink, Heart, HeartHandshake, Check, MessageCircle, Phone } from "lucide-react";
+import type { PublicUser, Connection, Relation } from "@shared/schema";
+import { ArrowLeft, ExternalLink, Heart, HeartHandshake, Check, MessageCircle, Phone, Mail, Clock, Lock } from "lucide-react";
 import { PowerBadge } from "@/components/power-badge";
 
 export default function AttendeeProfile() {
@@ -26,9 +26,12 @@ export default function AttendeeProfile() {
       if (!res.ok) throw new Error("Attendee not found");
       return res.json();
     },
+    // Her answer to a request changes what this page may show, so keep it fresh.
+    refetchOnMount: "always",
+    refetchInterval: 15000,
   });
 
-  const { data: connData } = useQuery<{ connection: Connection | null }>({
+  const { data: connData } = useQuery<{ connection: Connection | null; relation: Relation }>({
     queryKey: ["/api/connections", attendeeId],
     queryFn: async () => {
       const res = await authedFetch(`/api/connections/${attendeeId}`);
@@ -36,9 +39,14 @@ export default function AttendeeProfile() {
       return res.json();
     },
     enabled: !!attendeeId,
+    refetchOnMount: "always",
+    refetchInterval: 15000,
   });
 
-  const isConnected = !!connData?.connection;
+  const relation: Relation = connData?.relation ?? "none";
+  const isConnected = relation === "connected";
+  const isSelf = currentUser?.id === attendeeId;
+  const [actionError, setActionError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -46,22 +54,29 @@ export default function AttendeeProfile() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (connData?.connection) {
-      setNote(connData.connection.note ?? "");
-      setReminderDate(connData.connection.reminderDate ?? "");
-    }
-  }, [connData?.connection?.id]);
+    setNote(connData?.connection?.note ?? "");
+    setReminderDate(connData?.connection?.reminderDate ?? "");
+  }, [connData?.connection?.id, attendeeId]);
 
-  async function handleConnect() {
+  // request | accept | decline | remove (remove also takes back an unanswered request)
+  async function act(action: "request" | "accept" | "decline" | "remove") {
     setConnecting(true);
+    setActionError(null);
     try {
-      const res = await authedFetch(`/api/connections/${attendeeId}`, {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error("Could not connect");
-      await queryClient.invalidateQueries({ queryKey: ["/api/connections", attendeeId] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/connections"] });
+      const res = await authedFetch(
+        action === "remove" ? `/api/connections/${attendeeId}` : `/api/connections/${attendeeId}/${action}`,
+        { method: action === "remove" ? "DELETE" : "POST", body: JSON.stringify({}) }
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.message ?? "That did not work. Please try again.");
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/connections", attendeeId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/connections"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/users", attendeeId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/directory"] }),
+      ]);
     } finally {
       setConnecting(false);
     }
@@ -195,27 +210,74 @@ export default function AttendeeProfile() {
                     </Button>
                   </a>
                 )}
-                {isConnected ? (
+                {attendee.email && (
+                  <a href={`mailto:${attendee.email}`} data-testid="link-attendee-email" className="max-w-full">
+                    <Button variant="outline" size="sm" className="gap-1.5 max-w-full">
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{attendee.email}</span>
+                    </Button>
+                  </a>
+                )}
+                {isConnected && (
                   <Link href={`/messages/${attendee.id}`}>
                     <Button size="sm" variant="secondary" className="gap-1.5" data-testid="button-message-attendee">
                       <MessageCircle className="h-3.5 w-3.5" />
                       Message
                     </Button>
                   </Link>
-                ) : (
+                )}
+                {!isSelf && relation === "none" && (
                   <Button
                     variant="gold"
                     size="sm"
-                    onClick={handleConnect}
+                    onClick={() => act("request")}
                     disabled={connecting}
                     className="gap-1.5"
                     data-testid="button-connect-attendee"
                   >
                     <Heart className="h-3.5 w-3.5" />
-                    {connecting ? "Connecting..." : "Connect"}
+                    {connecting ? "Sending..." : "Ask to connect"}
                   </Button>
                 )}
+                {relation === "incoming" && (
+                  <>
+                    <Button variant="gold" size="sm" onClick={() => act("accept")} disabled={connecting} className="gap-1.5" data-testid="button-accept-attendee">
+                      <Check className="h-3.5 w-3.5" />
+                      Accept request
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => act("decline")} disabled={connecting} data-testid="button-decline-attendee">
+                      Decline
+                    </Button>
+                  </>
+                )}
               </div>
+
+              {relation === "incoming" && (
+                <p className="mt-3 text-sm text-muted-foreground" data-testid="text-relation-incoming">
+                  {attendee.name.split(" ")[0]} asked to connect with you. She is not told if you decline.
+                </p>
+              )}
+              {relation === "outgoing" && (
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-testid="text-relation-outgoing">
+                  <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+                    <Clock className="h-3.5 w-3.5 text-primary" />
+                    Request sent
+                  </span>
+                  <span>You can message her once she accepts.</span>
+                  <button type="button" onClick={() => act("remove")} disabled={connecting} className="underline font-semibold text-primary" data-testid="button-cancel-request">
+                    Take it back
+                  </button>
+                </div>
+              )}
+              {!isSelf && !isConnected && (
+                <p className="mt-3 text-xs text-muted-foreground flex items-start gap-1.5">
+                  <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Messaging and any contact details she shares open up once you are connected.
+                </p>
+              )}
+              {actionError && (
+                <p className="mt-3 text-sm text-destructive" role="alert" data-testid="text-connect-error">{actionError}</p>
+              )}
             </div>
           </div>
         </div>
@@ -272,6 +334,14 @@ export default function AttendeeProfile() {
               )}
             </p>
           </div>
+        )}
+
+        {isConnected && (
+          <p className="mt-5 text-center text-xs text-muted-foreground">
+            <button type="button" onClick={() => act("remove")} disabled={connecting} className="underline" data-testid="button-remove-connection">
+              Remove {attendee.name.split(" ")[0]} from my connections
+            </button>
+          </p>
         )}
       </div>
     </AppShell>

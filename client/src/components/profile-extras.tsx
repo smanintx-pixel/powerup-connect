@@ -7,6 +7,7 @@ import { CONFERENCE_YEARS, INTEREST_OPTIONS } from "@shared/event";
 export interface ProfileExtrasValue {
   phone: string;
   phoneVisible: boolean;
+  emailVisible: boolean;
   interests: string[];
   pastYears: number[];
 }
@@ -16,6 +17,8 @@ interface ProfileExtrasProps {
   onChange: (next: ProfileExtrasValue) => void;
   /** Show the past-conference picker (it is asked at sign-up, so set-up skips it). */
   showPastYears?: boolean;
+  /** Her sign-in email, shown next to its visibility switch. */
+  email?: string;
   idPrefix: string;
 }
 
@@ -29,8 +32,8 @@ export function phoneProblem(phone: string): string | null {
   return null;
 }
 
-/** "I'm here for", phone number with its visibility switch, and past conferences. */
-export function ProfileExtras({ value, onChange, showPastYears, idPrefix }: ProfileExtrasProps) {
+/** "I'm here for", contact details with their visibility switches, and past conferences. */
+export function ProfileExtras({ value, onChange, showPastYears, email, idPrefix }: ProfileExtrasProps) {
   const problem = phoneProblem(value.phone);
   return (
     <div className="space-y-5">
@@ -82,8 +85,27 @@ export function ProfileExtras({ value, onChange, showPastYears, idPrefix }: Prof
             </label>
             <p id={`${idPrefix}-phone-help`} className="text-xs text-muted-foreground">
               {value.phoneVisible
-                ? "Every attendee in the app can see it."
-                : "Off. Other attendees will not see your number."}
+                ? "On. Only women you have accepted as connections can see it."
+                : "Off. No one else sees your number."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 mt-4">
+          <Switch
+            id={`${idPrefix}-email-visible`}
+            checked={value.emailVisible}
+            onCheckedChange={(emailVisible) => onChange({ ...value, emailVisible })}
+            aria-describedby={`${idPrefix}-email-help`}
+            data-testid="switch-email-visible"
+          />
+          <div className="min-w-0">
+            <label htmlFor={`${idPrefix}-email-visible`} className="text-sm font-medium block">
+              Show my email address on my profile
+            </label>
+            <p id={`${idPrefix}-email-help`} className="text-xs text-muted-foreground break-words">
+              {value.emailVisible
+                ? `On. Only women you have accepted as connections can see ${email || "it"}.`
+                : `Off. No one else sees ${email || "your email"}.`}
             </p>
           </div>
         </div>

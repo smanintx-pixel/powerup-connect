@@ -2,6 +2,7 @@ import {
   accessCodes,
   users,
   connections,
+  connectionRequests,
   messages,
   sessions,
   userPhotos,
@@ -13,11 +14,13 @@ import {
   type InsertAccessCode,
   type User,
   type Connection,
+  type ConnectionRequest,
+  type Relation,
   type InsertConnection,
   type Message,
   type InsertMessage,
 } from "../shared/schema";
-import { eq, and, or, desc, ne, lt, sql } from "drizzle-orm";
+import { eq, and, or, desc, ne, lt, gt, sql } from "drizzle-orm";
 import { getDb } from "./db";
 
 export interface IStorage {
@@ -37,6 +40,14 @@ export interface IStorage {
   getConnection(userId: number, connectedUserId: number): Promise<Connection | undefined>;
   listConnectionsForUser(userId: number): Promise<Connection[]>;
   upsertConnection(userId: number, connectedUserId: number, updates: Partial<Pick<Connection, "note" | "reminderDate">>): Promise<Connection>;
+
+  // Connection requests
+  listRequestsForUser(userId: number): Promise<ConnectionRequest[]>;
+  getRelation(userId: number, otherUserId: number): Promise<Relation>;
+  requestConnection(userId: number, otherUserId: number): Promise<Relation>;
+  respondToRequest(userId: number, fromUserId: number, accept: boolean): Promise<boolean>;
+  removeConnection(userId: number, otherUserId: number): Promise<void>;
+  countRequestsSentSince(userId: number, since: number): Promise<number>;
 
   // Messages
   listConversation(userId: number, otherUserId: number): Promise<Message[]>;
@@ -146,6 +157,90 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
+  // ---------- Connection requests ----------
+
+  private async requestsBetween(a: number, b: number) {
+    if (!Number.isInteger(a) || !Number.isInteger(b)) return [];
+    return getDb()
+      .select()
+      .from(connectionRequests)
+      .where(
+        or(
+          and(eq(connectionRequests.fromUserId, a), eq(connectionRequests.toUserId, b)),
+          and(eq(connectionRequests.fromUserId, b), eq(connectionRequests.toUserId, a))
+        )
+      );
+  }
+
+  async listRequestsForUser(userId: number) {
+    return getDb()
+      .select()
+      .from(connectionRequests)
+      .where(or(eq(connectionRequests.fromUserId, userId), eq(connectionRequests.toUserId, userId)))
+      .orderBy(desc(connectionRequests.createdAt));
+  }
+
+  async getRelation(userId: number, otherUserId: number): Promise<Relation> {
+    return relationFrom(userId, await this.requestsBetween(userId, otherUserId));
+  }
+
+  async requestConnection(userId: number, otherUserId: number): Promise<Relation> {
+    const rows = await this.requestsBetween(userId, otherUserId);
+    if (rows.some((r) => r.status === "accepted")) return "connected";
+    // She already asked me (even if I said no earlier): asking her back connects us.
+    const hers = rows.find((r) => r.fromUserId === otherUserId);
+    if (hers) {
+      await getDb()
+        .update(connectionRequests)
+        .set({ status: "accepted", respondedAt: Date.now() })
+        .where(eq(connectionRequests.id, hers.id));
+      return "connected";
+    }
+    // I already asked. Pending or declined, there is nothing more to send.
+    if (rows.some((r) => r.fromUserId === userId)) return "outgoing";
+    await getDb()
+      .insert(connectionRequests)
+      .values({ fromUserId: userId, toUserId: otherUserId, status: "pending", createdAt: Date.now() })
+      .onConflictDoNothing();
+    return this.getRelation(userId, otherUserId);
+  }
+
+  async respondToRequest(userId: number, fromUserId: number, accept: boolean) {
+    if (!Number.isInteger(fromUserId)) return false;
+    const updated = await getDb()
+      .update(connectionRequests)
+      .set({ status: accept ? "accepted" : "declined", respondedAt: Date.now() })
+      .where(
+        and(
+          eq(connectionRequests.fromUserId, fromUserId),
+          eq(connectionRequests.toUserId, userId),
+          eq(connectionRequests.status, "pending")
+        )
+      )
+      .returning({ id: connectionRequests.id });
+    return updated.length > 0;
+  }
+
+  // Ends a connection, or withdraws my own pending request. A request I sent
+  // that she declined is kept, so removing cannot be used to ask again.
+  async removeConnection(userId: number, otherUserId: number) {
+    const rows = await this.requestsBetween(userId, otherUserId);
+    for (const r of rows) {
+      const mineAndPending = r.fromUserId === userId && r.status === "pending";
+      if (r.status === "accepted" || mineAndPending) {
+        await getDb().delete(connectionRequests).where(eq(connectionRequests.id, r.id));
+      }
+    }
+  }
+
+  async countRequestsSentSince(userId: number, since: number) {
+    const [row] = await getDb()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(connectionRequests)
+      .where(and(eq(connectionRequests.fromUserId, userId), gt(connectionRequests.createdAt, since)));
+    return row?.n ?? 0;
+  }
+
   async listConversation(userId: number, otherUserId: number) {
     if (!Number.isInteger(otherUserId)) return [];
     return getDb()
@@ -225,3 +320,11 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+/** Works out how `userId` stands with the other woman from the request rows between them. */
+export function relationFrom(userId: number, rows: ConnectionRequest[]): Relation {
+  if (rows.some((r) => r.status === "accepted")) return "connected";
+  if (rows.some((r) => r.fromUserId === userId)) return "outgoing"; // pending, or declined (not revealed)
+  if (rows.some((r) => r.toUserId === userId && r.status === "pending")) return "incoming";
+  return "none";
+}

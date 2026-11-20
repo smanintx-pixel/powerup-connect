@@ -37,7 +37,8 @@ export const users = connect.table("users", {
   photoUrl: text("photo_url").notNull().default(""),
   tags: text("tags").notNull().default("[]"), // JSON string array
   phone: text("phone").notNull().default(""),
-  phoneVisible: boolean("phone_visible").notNull().default(false), // show phone on her profile
+  phoneVisible: boolean("phone_visible").notNull().default(false), // show phone to her connections
+  emailVisible: boolean("email_visible").notNull().default(false), // show email to her connections
   interests: text("interests").notNull().default("[]"), // JSON string array, from INTEREST_OPTIONS
   pastYears: text("past_years").notNull().default("[]"), // JSON number array, from CONFERENCE_YEARS
   accessCode: text("access_code").notNull(),
@@ -69,6 +70,7 @@ export const insertUserSchema = createInsertSchema(users)
     tags: z.array(z.string()).optional().default([]),
     phone: phoneSchema.optional().default(""),
     phoneVisible: z.boolean().optional().default(false),
+    emailVisible: z.boolean().optional().default(false),
     interests: interestsSchema.optional().default([]),
     pastYears: pastYearsSchema.optional().default([]),
   });
@@ -94,7 +96,31 @@ export const userPhotos = connect.table("user_photos", {
 });
 export type UserPhoto = typeof userPhotos.$inferSelect;
 
-// Connections — private notes owned by the viewer
+// Connection requests. One row per direction: "from" asked "to". Two women are
+// connected once a row between them is accepted. A declined request stays on
+// file so the same person cannot keep asking.
+export const REQUEST_STATUSES = ["pending", "accepted", "declined"] as const;
+export const connectionRequests = connect.table("connection_requests", {
+  id: serial("id").primaryKey(),
+  fromUserId: integer("from_user_id").notNull(),
+  toUserId: integer("to_user_id").notNull(),
+  status: text("status").notNull().default("pending"), // one of REQUEST_STATUSES
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  respondedAt: bigint("responded_at", { mode: "number" }),
+}, (t) => [
+  uniqueIndex("connection_requests_pair_idx").on(t.fromUserId, t.toUserId),
+  index("connection_requests_to_idx").on(t.toUserId, t.status),
+]);
+export type ConnectionRequest = typeof connectionRequests.$inferSelect;
+
+/**
+ * How the signed-in woman stands with another attendee.
+ * "outgoing" also covers a request the other woman declined: the sender is
+ * never told she was turned down.
+ */
+export type Relation = "none" | "outgoing" | "incoming" | "connected";
+
+// Private notes and follow-up date, owned by the viewer, about a connection
 export const connections = connect.table("connections", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(), // owner of the note

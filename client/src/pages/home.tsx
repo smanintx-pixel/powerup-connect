@@ -56,7 +56,7 @@ export default function Home() {
       return res.json();
     },
   });
-  const connections = useQuery<{ connections: ConnectionWithUser[] }>({
+  const connections = useQuery<{ connections: ConnectionWithUser[]; incoming?: { id: number; user: PublicUser }[] }>({
     queryKey: ["/api/connections"],
     queryFn: async () => {
       const res = await authedFetch("/api/connections");
@@ -76,6 +76,7 @@ export default function Home() {
   const attendeeCount = directory.data?.users.length;
   const connectionCount = connections.data?.connections.length;
   const conversationCount = messages.data?.conversations.length;
+  const incoming = connections.data?.incoming ?? [];
 
   const followUps = useMemo(() => {
     return (connections.data?.connections ?? [])
@@ -110,8 +111,8 @@ export default function Home() {
     {
       key: "connect",
       done: (connectionCount ?? 0) > 0,
-      title: "Save your first connection",
-      body: "Met someone worth remembering? Save her with a private note and a follow-up date.",
+      title: "Make your first connection",
+      body: "Met someone worth remembering? Ask to connect. Once she accepts, add a private note and a follow-up date.",
       href: "/directory",
       cta: "Find her",
       icon: Heart,
@@ -120,7 +121,7 @@ export default function Home() {
       key: "message",
       done: (conversationCount ?? 0) > 0,
       title: "Send a message",
-      body: "Say hello while the conversation is still fresh.",
+      body: "Say hello to a connection while the conversation is still fresh.",
       href: "/messages",
       cta: "Open messages",
       icon: MessageCircle,
@@ -133,7 +134,7 @@ export default function Home() {
 
   const stats = [
     { label: attendeeCount === 1 ? "woman in the directory" : "women in the directory", value: attendeeCount, href: "/directory", tone: "pu-blue", shape: "pu-shape-0" },
-    { label: connectionCount === 1 ? "connection saved" : "connections saved", value: connectionCount, href: "/connections", tone: "pu-purple", shape: "pu-shape-1" },
+    { label: connectionCount === 1 ? "connection" : "connections", value: connectionCount, href: "/connections", tone: "pu-purple", shape: "pu-shape-1" },
     { label: conversationCount === 1 ? "conversation" : "conversations", value: conversationCount, href: "/messages", tone: "pu-green", shape: "pu-shape-2" },
   ];
 
@@ -141,19 +142,19 @@ export default function Home() {
     {
       icon: Users,
       title: "Directory",
-      body: "Everyone at the conference who has joined the app. Open a profile to read her bio and connect.",
+      body: "Everyone at the conference who has joined the app. Open a profile to read her bio and ask to connect.",
       href: "/directory",
     },
     {
       icon: Heart,
       title: "Connections",
-      body: "The women you saved, with your private notes and the date you want to follow up.",
+      body: "Requests to connect, and the women you are connected with, plus your private notes and follow-up dates.",
       href: "/connections",
     },
     {
       icon: MessageCircle,
       title: "Messages",
-      body: "One-to-one messages with other attendees. No phone numbers needed.",
+      body: "One-to-one messages with your connections. No phone numbers needed.",
       href: "/messages",
     },
     {
@@ -214,6 +215,30 @@ export default function Home() {
             </Link>
           ))}
         </Reveal>
+
+        {/* Requests waiting for her answer */}
+        {incoming.length > 0 && (
+          <Reveal as="section" aria-label="Requests to connect">
+            <Link href="/connections" className="block pu-rise">
+              <div className="rounded-2xl border-2 border-[#FFC933] bg-card p-4 flex items-center gap-3 hover-elevate active-elevate-2" data-testid="home-requests">
+                <span className="flex -space-x-3 shrink-0">
+                  {incoming.slice(0, 3).map((r) => (
+                    <InitialsAvatar key={r.id} name={r.user.name} photoUrl={r.user.photoUrl} className="h-10 w-10" />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold">
+                    {incoming.length === 1
+                      ? `${firstName(incoming[0].user.name)} asked to connect`
+                      : `${incoming.length} women asked to connect`}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">Accept or decline. It is your choice.</span>
+                </span>
+                <ArrowRight className="h-4 w-4 text-primary shrink-0" />
+              </div>
+            </Link>
+          </Reveal>
+        )}
 
         {/* Follow-ups */}
         {followUps.length > 0 && (
@@ -330,8 +355,12 @@ export default function Home() {
               <span>Everyone here joined with a conference access code.</span>
             </li>
             <li className="flex gap-3">
+              <Heart className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <span>No one can message you until you accept her request to connect. She is not told if you decline.</span>
+            </li>
+            <li className="flex gap-3">
               <UserRound className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-              <span>Other attendees see your photo, name, title, company, bio, tags, what you are here for and your LinkedIn link. Your email stays hidden, and your phone number shows only if you turn that on.</span>
+              <span>Other attendees see your photo, name, title, company, bio, tags, what you are here for and your LinkedIn link. Your phone number and email stay hidden unless you turn them on, and then only your connections see them.</span>
             </li>
           </ul>
           </div>

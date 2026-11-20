@@ -41,6 +41,7 @@ export default function Settings() {
   const [extras, setExtras] = useState<ProfileExtrasValue>({
     phone: user?.phone ?? "",
     phoneVisible: user?.phoneVisible ?? false,
+    emailVisible: user?.emailVisible ?? false,
     interests: user?.interests ?? [],
     pastYears: user?.pastYears ?? [],
   });
@@ -79,6 +80,7 @@ export default function Settings() {
           tags,
           phone: extras.phone.trim(),
           phoneVisible: extras.phoneVisible,
+          emailVisible: extras.emailVisible,
           interests: extras.interests,
           pastYears: extras.pastYears,
         }),
@@ -209,7 +211,7 @@ export default function Settings() {
                 )}
               </div>
 
-              <ProfileExtras value={extras} onChange={(v) => { setExtras(v); setStatus("idle"); }} showPastYears idPrefix="settings" />
+              <ProfileExtras value={extras} onChange={(v) => { setExtras(v); setStatus("idle"); }} showPastYears email={user?.email} idPrefix="settings" />
 
               {saveError && (
                 <p className="text-sm text-destructive" role="alert" data-testid="text-settings-error">

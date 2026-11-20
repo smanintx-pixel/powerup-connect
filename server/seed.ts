@@ -176,6 +176,7 @@ export async function seedDemoData() {
       tags: JSON.stringify(attendee.tags),
       phone: "",
       phoneVisible: false,
+      emailVisible: false,
       interests: JSON.stringify(demoInterests[i % demoInterests.length]),
       pastYears: JSON.stringify(demoYears[i % demoYears.length]),
       accessCode: DEMO_CODE,

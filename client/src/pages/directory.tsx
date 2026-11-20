@@ -8,16 +8,23 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Search, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import type { PublicUser } from "@shared/schema";
+import type { PublicUser, Relation } from "@shared/schema";
 import { INTEREST_OPTIONS } from "@shared/event";
 import { PowerBadge } from "@/components/power-badge";
+
+const RELATION_LABEL: Record<Relation, string> = {
+  none: "",
+  connected: "Connected",
+  outgoing: "Request sent",
+  incoming: "Asked to connect",
+};
 
 export default function Directory() {
   const { authedFetch } = useAuth();
   const [query, setQuery] = useState("");
   const [interest, setInterest] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery<{ users: PublicUser[] }>({
+  const { data, isLoading } = useQuery<{ users: PublicUser[]; relations?: Record<number, Relation> }>({
     queryKey: ["/api/directory"],
     queryFn: async () => {
       const res = await authedFetch("/api/directory");
@@ -132,6 +139,11 @@ export default function Directory() {
                         {attendee.company}
                       </p>
                       <PowerBadge pastYears={attendee.pastYears} className="mt-1.5" />
+                      {RELATION_LABEL[data?.relations?.[attendee.id] ?? "none"] && (
+                        <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-primary" data-testid={`text-relation-${attendee.id}`}>
+                          {RELATION_LABEL[data?.relations?.[attendee.id] ?? "none"]}
+                        </p>
+                      )}
                     </div>
                   </div>
                   {attendee.tags.length > 0 && (

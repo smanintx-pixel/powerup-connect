@@ -16,6 +16,7 @@ export default function MessageThread() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const { data: userData } = useQuery<{ user: PublicUser }>({
@@ -27,7 +28,7 @@ export default function MessageThread() {
     },
   });
 
-  const { data: threadData, isLoading } = useQuery<{ messages: Message[] }>({
+  const { data: threadData, isLoading } = useQuery<{ messages: Message[]; canMessage: boolean }>({
     queryKey: ["/api/messages", otherUserId],
     queryFn: async () => {
       const res = await authedFetch(`/api/messages/${otherUserId}`);
@@ -50,7 +51,12 @@ export default function MessageThread() {
         method: "POST",
         body: JSON.stringify({ body }),
       });
-      if (res.ok) {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setSendError(data.message ?? "Your message could not be sent.");
+        await queryClient.invalidateQueries({ queryKey: ["/api/messages", otherUserId] });
+      } else {
+        setSendError(null);
         setDraft("");
         await queryClient.invalidateQueries({ queryKey: ["/api/messages", otherUserId] });
         await queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
@@ -62,6 +68,8 @@ export default function MessageThread() {
 
   const attendee = userData?.user;
   const messages = threadData?.messages ?? [];
+  // Until the thread has loaded, assume she can write; the server has the final say.
+  const canMessage = threadData?.canMessage ?? true;
 
   return (
     <AppShell>
@@ -99,7 +107,9 @@ export default function MessageThread() {
             </div>
           ) : messages.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-thread-empty">
-              No messages yet. Say hello to {attendee?.name.split(" ")[0] ?? "them"}.
+              {canMessage
+                ? `No messages yet. Say hello to ${attendee?.name.split(" ")[0] ?? "her"}.`
+                : "No messages yet."}
             </p>
           ) : (
             messages.map((msg) => {
@@ -126,6 +136,20 @@ export default function MessageThread() {
           <div ref={bottomRef} />
         </div>
 
+        {sendError && (
+          <p className="text-sm text-destructive mb-2" role="alert" data-testid="text-send-error">{sendError}</p>
+        )}
+        {!canMessage ? (
+          <div className="rounded-xl border border-card-border bg-muted/60 p-4 text-sm" data-testid="notice-not-connected">
+            <p className="font-semibold mb-1">You are not connected</p>
+            <p className="text-muted-foreground mb-3">
+              Messages go only between women who have accepted each other&rsquo;s connection request.
+            </p>
+            <Link href={`/attendee/${otherUserId}`}>
+              <Button size="sm" variant="outline" data-testid="button-thread-view-profile">View her profile</Button>
+            </Link>
+          </div>
+        ) : (
         <div className="flex items-end gap-2">
           <Textarea
             value={draft}
@@ -140,10 +164,11 @@ export default function MessageThread() {
             className="min-h-[44px] max-h-32 resize-none"
             data-testid="textarea-message-draft"
           />
-          <Button onClick={handleSend} disabled={sending || !draft.trim()} size="icon" data-testid="button-send-message">
+          <Button onClick={handleSend} disabled={sending || !draft.trim()} size="icon" aria-label="Send message" data-testid="button-send-message">
             <Send className="h-4 w-4" />
           </Button>
         </div>
+        )}
       </div>
     </AppShell>
   );

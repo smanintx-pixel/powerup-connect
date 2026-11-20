@@ -47,8 +47,8 @@ export default function Messages() {
             <MessageCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
             <h3 className="text-base font-bold mb-1">No conversations yet</h3>
             <p className="text-sm text-muted-foreground max-w-xs mb-5">
-              Connect with someone in the directory, then send them a message from their
-              profile.
+Send a connection request from someone&rsquo;s profile. Once she accepts, you can
+              message each other.
             </p>
             <Link href="/directory">
               <Button data-testid="button-messages-browse-directory">

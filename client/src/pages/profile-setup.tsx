@@ -51,6 +51,7 @@ export default function ProfileSetup() {
   const [extras, setExtras] = useState<ProfileExtrasValue>({
     phone: user?.phone ?? "",
     phoneVisible: user?.phoneVisible ?? false,
+    emailVisible: user?.emailVisible ?? false,
     interests: user?.interests ?? [],
     pastYears: user?.pastYears ?? [],
   });
@@ -90,6 +91,7 @@ export default function ProfileSetup() {
           tags,
           phone: extras.phone.trim(),
           phoneVisible: extras.phoneVisible,
+          emailVisible: extras.emailVisible,
           interests: extras.interests,
         }),
       });
@@ -241,7 +243,7 @@ export default function ProfileSetup() {
               </div>
             </div>
 
-            <ProfileExtras value={extras} onChange={setExtras} idPrefix="setup" />
+            <ProfileExtras value={extras} onChange={setExtras} email={user?.email} idPrefix="setup" />
 
             <Button type="submit" className="w-full" disabled={isSubmitting} data-testid="button-save-profile">
               {isSubmitting ? "Saving..." : "Save and continue"}
