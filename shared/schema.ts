@@ -153,6 +153,13 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Message = typeof messages.$inferSelect;
 
+// One row per call an attendee starts with the AI host, to cap calls per person.
+export const hostCalls = connect.table("host_calls", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => [index("host_calls_user_idx").on(t.userId, t.createdAt)]);
+
 // Sign-in sessions. Only a SHA-256 hash of the token is stored, so a copy of this
 // table cannot be used to sign in as someone.
 export const sessions = connect.table("sessions", {

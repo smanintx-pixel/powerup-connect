@@ -3,6 +3,7 @@ import {
   users,
   connections,
   connectionRequests,
+  hostCalls,
   messages,
   sessions,
   userPhotos,
@@ -48,6 +49,10 @@ export interface IStorage {
   respondToRequest(userId: number, fromUserId: number, accept: boolean): Promise<boolean>;
   removeConnection(userId: number, otherUserId: number): Promise<void>;
   countRequestsSentSince(userId: number, since: number): Promise<number>;
+
+  // AI host calls
+  countHostCallsSince(userId: number, since: number): Promise<number>;
+  recordHostCall(userId: number): Promise<void>;
 
   // Messages
   listConversation(userId: number, otherUserId: number): Promise<Message[]>;
@@ -239,6 +244,18 @@ export class DatabaseStorage implements IStorage {
       .from(connectionRequests)
       .where(and(eq(connectionRequests.fromUserId, userId), gt(connectionRequests.createdAt, since)));
     return row?.n ?? 0;
+  }
+
+  async countHostCallsSince(userId: number, since: number) {
+    const [row] = await getDb()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(hostCalls)
+      .where(and(eq(hostCalls.userId, userId), gt(hostCalls.createdAt, since)));
+    return row?.n ?? 0;
+  }
+
+  async recordHostCall(userId: number) {
+    await getDb().insert(hostCalls).values({ userId, createdAt: Date.now() });
   }
 
   async listConversation(userId: number, otherUserId: number) {

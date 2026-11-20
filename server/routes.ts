@@ -10,6 +10,7 @@ import {
   pastYearsSchema,
 } from "../shared/schema";
 import { MAX_PHOTO_BYTES } from "../shared/event";
+import { hostEnabled, mintHostToken, HOST_NAME, HOST_MAX_SECONDS, HOST_CALLS_PER_HOUR, HOST_CALLS_PER_DAY } from "./host";
 import { z } from "zod";
 import type { User, PublicUser, Relation, ConnectionRequest } from "../shared/schema";
 
@@ -275,6 +276,45 @@ export function registerRoutes(app: Express): void {
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Could not load the sessions." });
+    }
+  });
+
+  // ---------- AI HOST ----------
+  // A live video persona (Nuance Labs). The API key never leaves the server:
+  // the page gets a single-use token that starts one call.
+
+  app.get("/api/host/status", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    res.json({ enabled: hostEnabled(), name: HOST_NAME, maxSeconds: HOST_MAX_SECONDS });
+  });
+
+  app.post("/api/host/token", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    if (!hostEnabled()) return res.status(503).json({ code: "not_configured", message: `${HOST_NAME} is not switched on yet.` });
+    try {
+      const now = Date.now();
+      const [lastHour, lastDay] = await Promise.all([
+        storage.countHostCallsSince(user.id, now - 60 * 60 * 1000),
+        storage.countHostCallsSince(user.id, now - 24 * 60 * 60 * 1000),
+      ]);
+      if (lastHour >= HOST_CALLS_PER_HOUR || lastDay >= HOST_CALLS_PER_DAY) {
+        return res.status(429).json({
+          code: "personal_limit",
+          message: lastDay >= HOST_CALLS_PER_DAY
+            ? `You have talked with ${HOST_NAME} a lot today. She will be back for you tomorrow.`
+            : `You have talked with ${HOST_NAME} a few times this hour. Try again a little later.`,
+        });
+      }
+      const result = await mintHostToken(user, await storage.listEventSessions());
+      if (!result.ok) return res.status(result.status).json({ code: result.code, message: result.message });
+      await storage.recordHostCall(user.id);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ token: result.token });
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      res.status(500).json({ message: `${HOST_NAME} could not start. Please try again later.` });
     }
   });
 

@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, lazy, Suspense } from "react";
 import { Switch, Route, Router, Redirect } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "./lib/queryClient";
@@ -19,6 +19,9 @@ import MessageThread from "@/pages/message-thread";
 import Sessions from "@/pages/sessions";
 import Settings from "@/pages/settings";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+
+// The AI host screen carries the video-call library, so it loads only when opened.
+const Host = lazy(() => import("@/pages/host"));
 import { ThemeProvider } from "@/lib/theme-context";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -63,6 +66,13 @@ function AppRouter() {
       <Route path="/home">
         <RequireAuth>
           <Home />
+        </RequireAuth>
+      </Route>
+      <Route path="/host">
+        <RequireAuth>
+          <Suspense fallback={null}>
+            <Host />
+          </Suspense>
         </RequireAuth>
       </Route>
       <Route path="/directory">

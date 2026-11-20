@@ -12,6 +12,7 @@ import {
   Calendar,
   Lock,
   Ticket,
+  Sparkles,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -69,6 +70,15 @@ export default function Home() {
     queryFn: async () => {
       const res = await authedFetch("/api/messages");
       if (!res.ok) throw new Error("Could not load messages.");
+      return res.json();
+    },
+  });
+
+  const host = useQuery<{ enabled: boolean; name: string }>({
+    queryKey: ["/api/host/status"],
+    queryFn: async () => {
+      const res = await authedFetch("/api/host/status");
+      if (!res.ok) throw new Error("Could not check the host.");
       return res.json();
     },
   });
@@ -215,6 +225,24 @@ export default function Home() {
             </Link>
           ))}
         </Reveal>
+
+        {/* AI host, shown only when it is switched on */}
+        {host.data?.enabled && (
+          <Reveal as="section" aria-label="AI host">
+            <Link href="/host" className="block pu-rise">
+              <div className="pu-night text-white rounded-[28px_28px_28px_10px] p-5 flex items-center gap-4 shadow-md hover-elevate active-elevate-2 pu-lift" data-testid="home-host">
+                <span className="shrink-0 h-12 w-12 rounded-full pu-sun text-[#0B1440] flex items-center justify-center">
+                  <Sparkles className="h-6 w-6" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-extrabold">Talk with {host.data.name}, your AI host</span>
+                  <span className="block text-sm text-white/85">Ask about sessions, how the app works, or practice your introduction.</span>
+                </span>
+                <ArrowRight className="h-5 w-5 shrink-0 text-[#FFD23F]" />
+              </div>
+            </Link>
+          </Reveal>
+        )}
 
         {/* Requests waiting for her answer */}
         {incoming.length > 0 && (
