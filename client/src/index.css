@@ -454,6 +454,12 @@
     animation: pu-sheen 4.2s ease-in-out 1.2s infinite both;
   }
 
+  /* Landing page: sample cards drop in one by one, then bob gently */
+  @keyframes pu-card-in { from { opacity: 0; translate: 40px 24px; } to { opacity: 1; translate: 0 0; } }
+  .pu-card-in { animation: pu-card-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(350ms + var(--i, 0) * 160ms); }
+  @keyframes pu-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -7px; } }
+  .pu-bob { animation: pu-bob 6s ease-in-out infinite; animation-delay: calc(1200ms + var(--i, 0) * 900ms); }
+
   /* Tiles lift a little under the pointer or a tap */
   .pu-lift { transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s ease; }
   .pu-lift:hover { transform: translateY(-4px) rotate(-0.6deg); }
