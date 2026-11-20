@@ -180,6 +180,8 @@ export async function seedDemoData() {
       interests: JSON.stringify(demoInterests[i % demoInterests.length]),
       pastYears: JSON.stringify(demoYears[i % demoYears.length]),
       accessCode: DEMO_CODE,
+      termsVersion: "", // demo accounts are asked to agree on first sign-in
+      termsAcceptedAt: null,
       createdAt: Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 10),
     });
   }

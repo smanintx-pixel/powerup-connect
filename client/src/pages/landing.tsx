@@ -205,7 +205,10 @@ export default function Landing() {
           </a>
           <div className="text-xs space-y-1 sm:text-right">
             <p>PowerUp Connect, the networking app for the Power Up Women&rsquo;s Conference</p>
-            <p className="opacity-80">Prototype build &middot; not for production use</p>
+            <p className="opacity-80">
+              <Link href="/terms" className="underline">Terms of Service</Link> &middot;{" "}
+              <Link href="/privacy" className="underline">Privacy Policy</Link> &middot; Private beta
+            </p>
           </div>
         </div>
       </footer>

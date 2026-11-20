@@ -41,6 +41,8 @@ export const users = connect.table("users", {
   emailVisible: boolean("email_visible").notNull().default(false), // show email to her connections
   interests: text("interests").notNull().default("[]"), // JSON string array, from INTEREST_OPTIONS
   pastYears: text("past_years").notNull().default("[]"), // JSON number array, from CONFERENCE_YEARS
+  termsVersion: text("terms_version").notNull().default(""), // the Terms version she agreed to (shared/legal.ts)
+  termsAcceptedAt: bigint("terms_accepted_at", { mode: "number" }),
   accessCode: text("access_code").notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
@@ -63,7 +65,7 @@ export const pastYearsSchema = z
   .transform((v) => Array.from(new Set(v)).sort((a, b) => a - b));
 
 export const insertUserSchema = createInsertSchema(users)
-  .omit({ id: true, createdAt: true, passwordHash: true })
+  .omit({ id: true, createdAt: true, passwordHash: true, termsVersion: true, termsAcceptedAt: true })
   .extend({
     password: z.string().min(6, "Password must be at least 6 characters"),
     accessCode: z.string().min(1, "Access code is required"),
@@ -73,6 +75,7 @@ export const insertUserSchema = createInsertSchema(users)
     emailVisible: z.boolean().optional().default(false),
     interests: interestsSchema.optional().default([]),
     pastYears: pastYearsSchema.optional().default([]),
+    acceptTerms: z.literal(true, { errorMap: () => ({ message: "Please agree to the Terms of Service and Privacy Policy." }) }),
   });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -158,7 +161,32 @@ export const hostCalls = connect.table("host_calls", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  consentVersion: text("consent_version").notNull().default(""),
 }, (t) => [index("host_calls_user_idx").on(t.userId, t.createdAt)]);
+
+// Agreements and withdrawals (Terms of Service, AI host). Kept after an account
+// is deleted: user_id becomes null and `subject` remains.
+export const consentRecords = connect.table("consent_records", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id"),
+  subject: text("subject").notNull(),
+  kind: text("kind").notNull(), // "terms" | "host" | "host_withdrawn"
+  version: text("version").notNull(),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => [index("consent_records_user_idx").on(t.userId, t.kind, t.createdAt)]);
+export type ConsentRecord = typeof consentRecords.$inferSelect;
+
+// Reports about another attendee, reviewed by the owners.
+export const reports = connect.table("reports", {
+  id: serial("id").primaryKey(),
+  reporterId: integer("reporter_id"),
+  reportedUserId: integer("reported_user_id"),
+  reportedName: text("reported_name").notNull().default(""),
+  reason: text("reason").notNull(),
+  details: text("details").notNull().default(""),
+  status: text("status").notNull().default("open"),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+}, (t) => [index("reports_status_idx").on(t.status, t.createdAt)]);
 
 // A business in the Black-owned business directory (shared/businesses.json,
 // built from data/black-owned-businesses-nova.md by scripts/import-businesses.mjs).

@@ -21,6 +21,9 @@ import Businesses from "@/pages/businesses";
 import Resources from "@/pages/resources";
 import Settings from "@/pages/settings";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
+import LegalPage from "@/pages/legal";
+import { AcceptTerms } from "@/components/accept-terms";
+import { TERMS_VERSION } from "@shared/legal";
 
 // The AI host screen carries the video-call library, so it loads only when opened.
 const Host = lazy(() => import("@/pages/host"));
@@ -32,6 +35,7 @@ function RequireAuth({ children }: { children: ReactNode }) {
   if (!user || !token) {
     return <Redirect to="/login" />;
   }
+  if (user.termsVersion !== TERMS_VERSION) return <AcceptTerms />;
   return <>{children}</>;
 }
 
@@ -51,6 +55,12 @@ function AppRouter() {
         <RedirectIfAuthed>
           <Landing />
         </RedirectIfAuthed>
+      </Route>
+      <Route path="/terms">
+        <LegalPage kind="terms" />
+      </Route>
+      <Route path="/privacy">
+        <LegalPage kind="privacy" />
       </Route>
       <Route path="/signup">
         <Signup />

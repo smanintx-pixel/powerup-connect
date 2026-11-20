@@ -10,7 +10,8 @@ import {
   pastYearsSchema,
 } from "../shared/schema";
 import { MAX_PHOTO_BYTES } from "../shared/event";
-import { hostEnabled, mintHostToken, HOST_NAME, HOST_MAX_SECONDS, HOST_CALLS_PER_HOUR, HOST_CALLS_PER_DAY } from "./host";
+import { hostEnabled, mintHostToken, nuanceEndUserId, HOST_NAME, HOST_MAX_SECONDS, HOST_CALLS_PER_HOUR, HOST_CALLS_PER_DAY } from "./host";
+import { TERMS_VERSION, HOST_CONSENT_VERSION, HOST_RESTRICTED_REGIONS, REPORT_REASONS } from "../shared/legal";
 import { z } from "zod";
 import type { User, PublicUser, Relation, ConnectionRequest, Business, Resource } from "../shared/schema";
 import resourceList from "../shared/resources.json";
@@ -52,6 +53,8 @@ function toAttendeeView(user: User, connected: boolean): PublicUser {
     ...toPublicUser(user),
     email: connected && user.emailVisible ? user.email : "",
     accessCode: "",
+    termsVersion: "",
+    termsAcceptedAt: null,
     phone: connected && user.phoneVisible ? user.phone : "",
   };
 }
@@ -145,9 +148,12 @@ export function registerRoutes(app: Express): void {
         interests: JSON.stringify(parsed.interests ?? []),
         pastYears: JSON.stringify(parsed.pastYears ?? []),
         accessCode: codeRow.code,
+        termsVersion: TERMS_VERSION, // signup requires acceptTerms: true
+        termsAcceptedAt: Date.now(),
         createdAt: Date.now(),
       });
       await storage.incrementAccessCodeUse(codeRow.id);
+      await storage.addConsentRecord(user.id, nuanceEndUserId(user.id), "terms", TERMS_VERSION);
 
       const token = await createSession(user.id);
       res.json({ token, user: toPublicUser(user) });
@@ -191,6 +197,73 @@ export function registerRoutes(app: Express): void {
       console.error(err);
     }
     res.json({ ok: true });
+  });
+
+  // ---------- TERMS, ACCOUNT DELETION, REPORTS ----------
+
+  // Agree to the current Terms of Service and Privacy Policy (for accounts made
+  // before they existed, or after a new version).
+  app.post("/api/legal/accept", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    if (req.body?.version !== TERMS_VERSION || req.body?.agree !== true) {
+      return res.status(400).json({ message: "Please agree to the current Terms of Service and Privacy Policy." });
+    }
+    try {
+      const now = Date.now();
+      const updated = await storage.updateUser(user.id, { termsVersion: TERMS_VERSION, termsAcceptedAt: now });
+      await storage.addConsentRecord(user.id, nuanceEndUserId(user.id), "terms", TERMS_VERSION);
+      res.json({ user: toPublicUser(updated!) });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not save your agreement." });
+    }
+  });
+
+  // Delete my account. Needs the password again, so a borrowed phone cannot do it.
+  app.delete("/api/users/me", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!password || !verifyPassword(password, user.passwordHash)) {
+      return res.status(403).json({ message: "That password is not right." });
+    }
+    try {
+      await storage.deleteUser(user.id);
+      console.log("[account] an account was deleted at the attendee's request");
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not delete your account. Please try again." });
+    }
+  });
+
+  // Report another attendee to the owners.
+  app.post("/api/users/:id/report", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    const target = await storage.getUser(Number(req.params.id));
+    if (!target || target.id === user.id) return res.status(404).json({ message: "Attendee not found." });
+    const parsed = z
+      .object({ reason: z.enum(REPORT_REASONS), details: z.string().trim().max(2000).optional().default("") })
+      .safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ message: "Choose a reason for the report." });
+    try {
+      if ((await storage.countReportsSince(user.id, Date.now() - 24 * 60 * 60 * 1000)) >= 10) {
+        return res.status(429).json({ message: "You have sent several reports today. Please write to the conference team instead." });
+      }
+      await storage.createReport({
+        reporterId: user.id,
+        reportedUserId: target.id,
+        reportedName: target.name,
+        reason: parsed.data.reason,
+        details: parsed.data.details,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not send the report. Please try again." });
+    }
   });
 
   // ---------- PROFILE ----------
@@ -359,10 +432,61 @@ export function registerRoutes(app: Express): void {
   // A live video persona (Nuance Labs). The API key never leaves the server:
   // the page gets a single-use token that starts one call.
 
+  // Has she agreed to the current host consent, and not withdrawn it since?
+  async function hasHostConsent(userId: number) {
+    const latest = await storage.latestHostConsent(userId);
+    return latest?.kind === "host" && latest.version === HOST_CONSENT_VERSION;
+  }
+
   app.get("/api/host/status", async (req, res) => {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
-    res.json({ enabled: hostEnabled(), name: HOST_NAME, maxSeconds: HOST_MAX_SECONDS });
+    try {
+      res.json({
+        enabled: hostEnabled(),
+        name: HOST_NAME,
+        maxSeconds: HOST_MAX_SECONDS,
+        consented: await hasHostConsent(user.id),
+        consentVersion: HOST_CONSENT_VERSION,
+        restrictedRegions: HOST_RESTRICTED_REGIONS,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not check the host." });
+    }
+  });
+
+  // Consent Nuance Labs requires before any call: recording and processing of
+  // the conversation, its privacy policy, and that she does not live where the
+  // service is not offered. Recorded with the version she saw.
+  app.post("/api/host/consent", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    const b = req.body ?? {};
+    if (b.version !== HOST_CONSENT_VERSION || b.agreeRecording !== true || b.agreePrivacy !== true || b.notRestrictedResident !== true) {
+      return res.status(400).json({ message: `Please tick all three boxes to talk with ${HOST_NAME}.` });
+    }
+    try {
+      await storage.addConsentRecord(user.id, nuanceEndUserId(user.id), "host", HOST_CONSENT_VERSION);
+      res.json({ consented: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not save your agreement." });
+    }
+  });
+
+  // Withdraw that consent. The owners must pass withdrawals on to Nuance Labs.
+  app.delete("/api/host/consent", async (req, res) => {
+    const user = await requireAuth(req);
+    if (!user) return res.status(401).json({ message: "Not logged in." });
+    try {
+      await storage.addConsentRecord(user.id, nuanceEndUserId(user.id), "host_withdrawn", HOST_CONSENT_VERSION);
+      console.log("[host] an attendee withdrew consent; tell Nuance Labs (see connect.consent_records)");
+      res.json({ consented: false });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Could not save that change." });
+    }
   });
 
   app.post("/api/host/token", async (req, res) => {
@@ -370,6 +494,9 @@ export function registerRoutes(app: Express): void {
     if (!user) return res.status(401).json({ message: "Not logged in." });
     if (!hostEnabled()) return res.status(503).json({ code: "not_configured", message: `${HOST_NAME} is not switched on yet.` });
     try {
+      if (!(await hasHostConsent(user.id))) {
+        return res.status(403).json({ code: "consent_required", message: `Please agree to the terms for ${HOST_NAME} first.` });
+      }
       const now = Date.now();
       const [lastHour, lastDay] = await Promise.all([
         storage.countHostCallsSince(user.id, now - 60 * 60 * 1000),
@@ -385,7 +512,7 @@ export function registerRoutes(app: Express): void {
       }
       const result = await mintHostToken(user, await storage.listEventSessions());
       if (!result.ok) return res.status(result.status).json({ code: result.code, message: result.message });
-      await storage.recordHostCall(user.id);
+      await storage.recordHostCall(user.id, HOST_CONSENT_VERSION);
       res.setHeader("Cache-Control", "no-store");
       res.json({ token: result.token });
     } catch (err) {

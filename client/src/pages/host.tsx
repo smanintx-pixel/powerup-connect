@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, MediaAccessError, PolicyCurfewError, MaintenanceError } from "@nuancelabs/js-sdk";
 import { useNuanceConversation } from "@nuancelabs/js-sdk/react";
 import { ArrowLeft, Mic, MicOff, PhoneOff, Video, Sparkles, Lock, Clock, LifeBuoy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { NUANCE_PRIVACY_URL } from "@shared/legal";
 import { useAuth } from "@/lib/auth-context";
 
-type HostStatus = { enabled: boolean; name: string; maxSeconds: number };
+type HostStatus = { enabled: boolean; name: string; maxSeconds: number; consented: boolean; consentVersion: string; restrictedRegions: string[] };
 
 /** An error from our own server when it will not hand out a call token. Its message is safe to show. */
 class HostStartError extends Error {}
@@ -38,8 +40,83 @@ const END_MESSAGES: Record<string, string> = {
   ended: "The call has ended.",
 };
 
+/** The agreement Nuance Labs requires before any call. Recorded on the server with its version. */
+function HostConsent({ status, onDone }: { status: HostStatus; onDone: () => void }) {
+  const { authedFetch } = useAuth();
+  const [agreeRecording, setAgreeRecording] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [notRestricted, setNotRestricted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const name = status.name;
+  const regions = status.restrictedRegions;
+  const regionText = regions.length > 1 ? `${regions.slice(0, -1).join(", ")} or ${regions[regions.length - 1]}` : regions.join("");
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await authedFetch("/api/host/consent", {
+        method: "POST",
+        body: JSON.stringify({ version: status.consentVersion, agreeRecording, agreePrivacy, notRestrictedResident: notRestricted }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message ?? "Could not save your agreement.");
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your agreement.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const Box = ({ checked, onChange, id, children }: { checked: boolean; onChange: (v: boolean) => void; id: string; children: React.ReactNode }) => (
+    <label className="flex items-start gap-3 text-sm cursor-pointer">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} className="mt-0.5" data-testid={`checkbox-${id}`} />
+      <span>{children}</span>
+    </label>
+  );
+
+  return (
+    <div className="rounded-2xl border-2 border-[#FFC933] bg-card p-6" data-testid="panel-host-consent">
+      <h2 className="text-lg font-extrabold mb-1">Before your first call</h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        {name} is an artificial intelligence, not a person. She is run by Nuance Labs, an independent company. Please read and agree to
+        the following. You only need to do this once.
+      </p>
+      <ul className="text-sm space-y-2 mb-5 list-disc pl-5">
+        <li>Nuance Labs records and stores your calls with {name}, including your voice and what you say, and may use them to improve its service and train its AI models. Your camera stays off.</li>
+        <li>To start a call, the app sends Nuance Labs your first name, what you are here for, how many past conferences you attended, the session list and a code that stands for your account. Nothing else from your profile.</li>
+        <li>{name} can be wrong, and she does not give medical, mental health, legal or financial advice. In an emergency call 911, or call or text 988.</li>
+        <li>Do not tell her financial, medical or ID details, or other people's personal information.</li>
+      </ul>
+      <div className="space-y-3 mb-5">
+        <Box id="host-recording" checked={agreeRecording} onChange={setAgreeRecording}>
+          I agree that Nuance Labs may record, store and use my calls with {name} as described above, and I direct the app to send it the
+          information listed.
+        </Box>
+        <Box id="host-privacy" checked={agreePrivacy} onChange={setAgreePrivacy}>
+          I have read{" "}
+          <a href={NUANCE_PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline">Nuance Labs' privacy policy</a>.
+        </Box>
+        <Box id="host-region" checked={notRestricted} onChange={setNotRestricted}>
+          I do not live in {regionText}, where Nuance Labs does not offer this service.
+        </Box>
+      </div>
+      {error && <p className="mb-3 text-sm text-destructive" role="alert">{error}</p>}
+      <Button variant="gold" onClick={submit} disabled={busy || !agreeRecording || !agreePrivacy || !notRestricted} data-testid="button-host-consent">
+        {busy ? "Saving..." : "Agree and continue"}
+      </Button>
+      <p className="mt-4 text-xs text-muted-foreground">
+        You can withdraw this agreement in Settings. If you do not agree, the rest of the app works as usual.
+      </p>
+    </div>
+  );
+}
+
 export default function Host() {
   const { authedFetch } = useAuth();
+  const queryClient = useQueryClient();
   const [muted, setMuted] = useState(false);
   const [presented, setPresented] = useState(false);
   const [endNote, setEndNote] = useState<string | null>(null);
@@ -63,10 +140,11 @@ export default function Host() {
     const res = await authedFetch("/api/host/token", { method: "POST", body: JSON.stringify({}) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || typeof data.token !== "string") {
+      if (data.code === "consent_required") queryClient.invalidateQueries({ queryKey: ["/api/host/status"] });
       throw new HostStartError(data.message ?? "The call could not start. Please try again later.");
     }
     return data.token as string;
-  }, [authedFetch]);
+  }, [authedFetch, queryClient]);
 
   const { state, error, conversation, videoRef, audioRef, start, end } = useNuanceConversation({
     token: fetchToken,
@@ -167,6 +245,8 @@ export default function Host() {
 
         {status.isLoading ? (
           <div className="skeleton h-64 rounded-2xl" data-testid="skeleton-host" />
+        ) : status.data?.enabled && !status.data.consented ? (
+          <HostConsent status={status.data} onDone={() => queryClient.invalidateQueries({ queryKey: ["/api/host/status"] })} />
         ) : !status.data?.enabled ? (
           <div className="rounded-2xl border border-card-border bg-card p-6 text-sm" data-testid="notice-host-off">
             <p className="font-bold mb-1">{name} is not available yet</p>
@@ -234,6 +314,10 @@ export default function Host() {
                     {errorText}
                   </p>
                 )}
+                <p className="mb-4 rounded-xl bg-muted px-4 py-3 text-sm" data-testid="text-host-call-notice">
+                  {name} is an AI, run by Nuance Labs. This call is recorded by Nuance Labs and may be used to train its AI, as you
+                  agreed. Starting the call confirms that again.
+                </p>
                 <Button variant="gold" size="lg" onClick={handleStart} className="gap-2 pu-glow" data-testid="button-host-start">
                   <Video className="h-4 w-4" />
                   {startedOnce.current ? `Talk with ${name} again` : `Start talking with ${name}`}

@@ -19,6 +19,15 @@ export const HOST_CALLS_PER_DAY = 10;
 const API_URL = (process.env.NUANCE_API_URL || "https://api.nuancelabs.ai").replace(/\/+$/, "");
 const PERSONAS = ["sam", "sonia", "mira"];
 
+/**
+ * The non-identifying code Nuance Labs receives as end_user_id for this attendee.
+ * Also stored on consent records so they can be matched to Nuance's records
+ * after an account is deleted.
+ */
+export function nuanceEndUserId(userId: number): string {
+  return "pu_" + crypto.createHash("sha256").update(`powerup-connect:host:${userId}`).digest("hex").slice(0, 32);
+}
+
 export function hostEnabled(): boolean {
   return Boolean(process.env.NUANCE_API_KEY);
 }
@@ -106,7 +115,7 @@ export async function mintHostToken(user: User, sessions: SessionWithMaterials[]
 
   const persona = (process.env.NUANCE_PERSONA_ID || "mira").toLowerCase();
   // Nuance asks for an id that does not identify the person: a hash, never a name or email.
-  const endUserId = "pu_" + crypto.createHash("sha256").update(`powerup-connect:host:${user.id}`).digest("hex").slice(0, 32);
+  const endUserId = nuanceEndUserId(user.id);
 
   const body: SessionTokenRequest = {
     interface: "nuance_live",

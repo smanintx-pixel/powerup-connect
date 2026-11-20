@@ -41,6 +41,7 @@ interface AuthContextValue extends AuthState {
     title?: string;
     company?: string;
     pastYears?: number[];
+    acceptTerms: true;
   }) => Promise<void>;
   logout: () => void;
   setUser: (user: PublicUser) => void;
@@ -129,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       title?: string;
       company?: string;
       pastYears?: number[];
+      acceptTerms: true;
     }) => {
       const res = await fetch(`${API_BASE}/api/auth/signup`, {
         method: "POST",

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/lib/auth-context";
 import { AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChipSelect } from "@/components/chip-select";
 import { PowerBadge } from "@/components/power-badge";
 import { CONFERENCE_YEARS } from "@shared/event";
@@ -38,6 +39,7 @@ export default function Signup() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pastYears, setPastYears] = useState<number[]>([]);
   const [created, setCreated] = useState(false);
+  const [agree, setAgree] = useState(false);
 
   // Move on only once the new sign-in has reached the rest of the app.
   // Navigating straight after signup() ran ahead of it, so the profile
@@ -55,7 +57,8 @@ export default function Signup() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await signup({ ...values, pastYears });
+      if (!agree) throw new Error("Please agree to the Terms of Service and Privacy Policy.");
+      await signup({ ...values, pastYears, acceptTerms: true });
       setCreated(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -194,10 +197,18 @@ export default function Signup() {
                 </p>
               )}
             </div>
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <Checkbox checked={agree} onCheckedChange={(v) => setAgree(v === true)} className="mt-0.5" data-testid="checkbox-signup-terms" />
+              <span>
+                I am 18 or older, and I agree to the{" "}
+                <a href="#/terms" target="_blank" rel="noopener" className="text-primary underline">Terms of Service</a> and{" "}
+                <a href="#/privacy" target="_blank" rel="noopener" className="text-primary underline">Privacy Policy</a>.
+              </span>
+            </label>
             <Button
               type="submit"
               className="w-full"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !agree}
               data-testid="button-submit-signup"
             >
               {isSubmitting ? "Creating account..." : "Create account"}

@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { PublicUser, Connection, Relation } from "@shared/schema";
 import { ArrowLeft, ExternalLink, Heart, HeartHandshake, Check, MessageCircle, Phone, Mail, Clock, Lock } from "lucide-react";
 import { PowerBadge } from "@/components/power-badge";
+import { ReportDialog } from "@/components/report-dialog";
 
 export default function AttendeeProfile() {
   const params = useParams<{ id: string }>();
@@ -336,11 +337,14 @@ export default function AttendeeProfile() {
           </div>
         )}
 
-        {isConnected && (
-          <p className="mt-5 text-center text-xs text-muted-foreground">
-            <button type="button" onClick={() => act("remove")} disabled={connecting} className="underline" data-testid="button-remove-connection">
-              Remove {attendee.name.split(" ")[0]} from my connections
-            </button>
+        {!isSelf && (
+          <p className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-center text-xs text-muted-foreground">
+            {isConnected && (
+              <button type="button" onClick={() => act("remove")} disabled={connecting} className="underline" data-testid="button-remove-connection">
+                Remove {attendee.name.split(" ")[0]} from my connections
+              </button>
+            )}
+            <ReportDialog userId={attendee.id} name={attendee.name} />
           </p>
         )}
       </div>

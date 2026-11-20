@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
 import type { PublicUser, Message } from "@shared/schema";
 import { ArrowLeft, Send } from "lucide-react";
+import { ReportDialog } from "@/components/report-dialog";
 
 export default function MessageThread() {
   const params = useParams<{ id: string }>();
@@ -85,7 +86,7 @@ export default function MessageThread() {
           {attendee && (
             <>
               <InitialsAvatar name={attendee.name} photoUrl={attendee.photoUrl} className="h-9 w-9" testId="avatar-thread-recipient" />
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium" data-testid="text-thread-recipient-name">
                   {attendee.name}
                 </p>
@@ -95,6 +96,7 @@ export default function MessageThread() {
                   {attendee.company}
                 </p>
               </div>
+              <ReportDialog userId={attendee.id} name={attendee.name} className="shrink-0" />
             </>
           )}
         </div>

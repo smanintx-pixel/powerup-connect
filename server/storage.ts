@@ -4,6 +4,8 @@ import {
   connections,
   connectionRequests,
   hostCalls,
+  consentRecords,
+  reports,
   businessSaves,
   messages,
   sessions,
@@ -58,7 +60,14 @@ export interface IStorage {
 
   // AI host calls
   countHostCallsSince(userId: number, since: number): Promise<number>;
-  recordHostCall(userId: number): Promise<void>;
+  recordHostCall(userId: number, consentVersion: string): Promise<void>;
+
+  // Consent, reports, deletion
+  addConsentRecord(userId: number, subject: string, kind: "terms" | "host" | "host_withdrawn", version: string): Promise<void>;
+  latestHostConsent(userId: number): Promise<{ kind: string; version: string } | undefined>;
+  createReport(r: { reporterId: number; reportedUserId: number; reportedName: string; reason: string; details: string }): Promise<void>;
+  countReportsSince(reporterId: number, since: number): Promise<number>;
+  deleteUser(userId: number): Promise<void>;
 
   // Messages
   listConversation(userId: number, otherUserId: number): Promise<Message[]>;
@@ -277,8 +286,42 @@ export class DatabaseStorage implements IStorage {
     return row?.n ?? 0;
   }
 
-  async recordHostCall(userId: number) {
-    await getDb().insert(hostCalls).values({ userId, createdAt: Date.now() });
+  async recordHostCall(userId: number, consentVersion: string) {
+    await getDb().insert(hostCalls).values({ userId, consentVersion, createdAt: Date.now() });
+  }
+
+  async addConsentRecord(userId: number, subject: string, kind: "terms" | "host" | "host_withdrawn", version: string) {
+    await getDb().insert(consentRecords).values({ userId, subject, kind, version, createdAt: Date.now() });
+  }
+
+  async latestHostConsent(userId: number) {
+    const [row] = await getDb()
+      .select({ kind: consentRecords.kind, version: consentRecords.version })
+      .from(consentRecords)
+      .where(and(eq(consentRecords.userId, userId), or(eq(consentRecords.kind, "host"), eq(consentRecords.kind, "host_withdrawn"))))
+      .orderBy(desc(consentRecords.createdAt), desc(consentRecords.id))
+      .limit(1);
+    return row;
+  }
+
+  async createReport(r: { reporterId: number; reportedUserId: number; reportedName: string; reason: string; details: string }) {
+    await getDb().insert(reports).values({ ...r, status: "open", createdAt: Date.now() });
+  }
+
+  async countReportsSince(reporterId: number, since: number) {
+    const [row] = await getDb()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(reports)
+      .where(and(eq(reports.reporterId, reporterId), gt(reports.createdAt, since)));
+    return row?.n ?? 0;
+  }
+
+  // Everything tied to the account goes with it (the database cascades to
+  // photos, connections, requests, notes, messages in both directions, saves,
+  // host calls and sign-in sessions). Consent records and reports keep their
+  // rows with the user id cleared.
+  async deleteUser(userId: number) {
+    await getDb().delete(users).where(eq(users.id, userId));
   }
 
   async listConversation(userId: number, otherUserId: number) {
