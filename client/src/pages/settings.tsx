@@ -4,7 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AppShell } from "@/components/app-shell";
-import { InitialsAvatar } from "@/components/initials-avatar";
+import { PhotoUpload } from "@/components/photo-upload";
+import { ProfileExtras, phoneProblem, type ProfileExtrasValue } from "@/components/profile-extras";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +27,6 @@ const settingsSchema = z.object({
   company: z.string().optional(),
   bio: z.string().max(240).optional(),
   linkedinUrl: z.string().optional(),
-  photoUrl: z.string().optional(),
 });
 
 type SettingsForm = z.infer<typeof settingsSchema>;
@@ -37,6 +37,13 @@ export default function Settings() {
   const [tags, setTags] = useState<string[]>(user?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [extras, setExtras] = useState<ProfileExtrasValue>({
+    phone: user?.phone ?? "",
+    phoneVisible: user?.phoneVisible ?? false,
+    interests: user?.interests ?? [],
+    pastYears: user?.pastYears ?? [],
+  });
 
   const form = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
@@ -46,7 +53,6 @@ export default function Settings() {
       company: user?.company ?? "",
       bio: user?.bio ?? "",
       linkedinUrl: user?.linkedinUrl ?? "",
-      photoUrl: user?.photoUrl ?? "",
     },
   });
 
@@ -62,16 +68,27 @@ export default function Settings() {
   }
 
   async function onSubmit(values: SettingsForm) {
+    setSaveError(null);
+    if (phoneProblem(extras.phone)) return;
     setStatus("saving");
-    const res = await authedFetch("/api/users/me", {
-      method: "PATCH",
-      body: JSON.stringify({ ...values, tags }),
-    });
-    if (res.ok) {
-      const data = await res.json();
+    try {
+      const res = await authedFetch("/api/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          ...values,
+          tags,
+          phone: extras.phone.trim(),
+          phoneVisible: extras.phoneVisible,
+          interests: extras.interests,
+          pastYears: extras.pastYears,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message ?? "Could not save your changes.");
       setUser(data.user);
       setStatus("saved");
-    } else {
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save your changes.");
       setStatus("idle");
     }
   }
@@ -90,12 +107,8 @@ export default function Settings() {
         </p>
 
         <div className="rounded-2xl border border-card-border bg-card p-6 sm:p-8 mb-6">
-          <div className="flex items-center gap-4 mb-6">
-            <InitialsAvatar name={user?.name ?? ""} photoUrl={form.watch("photoUrl")} className="h-14 w-14" testId="avatar-settings" />
-            <div>
-              <p className="text-sm font-medium">{user?.name}</p>
-              <p className="text-xs text-muted-foreground">{user?.email}</p>
-            </div>
+          <div className="mb-6">
+            <PhotoUpload />
           </div>
 
           <Form {...form}>
@@ -167,22 +180,9 @@ export default function Settings() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="photoUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Headshot photo URL</FormLabel>
-                    <FormControl>
-                      <Input data-testid="input-settings-photo" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <div>
-                <label className="text-sm font-medium mb-2 block">Tags (up to 3)</label>
+                <label className="text-sm font-medium mb-2 block">Industry tags (up to 3)</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {tags.map((tag) => (
                     <Badge key={tag} variant="secondary" className="gap-1">
@@ -208,6 +208,14 @@ export default function Settings() {
                   />
                 )}
               </div>
+
+              <ProfileExtras value={extras} onChange={(v) => { setExtras(v); setStatus("idle"); }} showPastYears idPrefix="settings" />
+
+              {saveError && (
+                <p className="text-sm text-destructive" role="alert" data-testid="text-settings-error">
+                  {saveError}
+                </p>
+              )}
 
               <Button type="submit" className="w-full" disabled={status === "saving"} data-testid="button-save-settings">
                 {status === "saving" ? "Saving..." : status === "saved" ? "Saved" : "Save changes"}

@@ -7,7 +7,9 @@ Full product spec: powerup_connect_spec.md. Branding: BRANDING.md (matches the P
 Express + Vite + React + Tailwind + shadcn/ui + Drizzle ORM (Postgres on Supabase via postgres-js).
 - Hosting: Netlify. Screens are static; the API is one Netlify Function (netlify/functions/api.ts wrapping server/app.ts). See DEPLOY.md.
 - Database: Supabase project "power-up", schema `connect`; needs DATABASE_URL (see .env.example).
-- Data model: shared/schema.ts
+- Data model: shared/schema.ts. Conference years, the five "I'm here for" interests and the All-Star / Legend badge rule live in shared/event.ts (no database imports, safe for the browser).
+- Profile photos: resized in the browser, stored in connect.user_photos, served from /api/photos/<random key>.
+- Privacy: other attendees never receive an email address or access code, and receive a phone number only when its owner turned "show on my profile" on (toAttendeeView in server/routes.ts).
 - API routes: server/routes.ts; storage layer: server/storage.ts
 - Pages: client/src/pages; routing uses wouter hash routing (useHashLocation)
 

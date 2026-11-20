@@ -2,7 +2,8 @@ import serverless from "serverless-http";
 import { createApp } from "../../server/app";
 
 // The whole API runs as one Netlify Function. netlify.toml sends /api/* here.
-const run = serverless(createApp());
+// Photos are binary, so they must be base64-encoded on the way out.
+const run = serverless(createApp(), { binary: ["image/*"] });
 const FN_PREFIX = "/.netlify/functions/api";
 
 export const handler = async (event: any, context: any) => {

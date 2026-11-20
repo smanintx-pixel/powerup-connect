@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/lib/auth-context";
 import { AlertCircle } from "lucide-react";
+import { ChipSelect } from "@/components/chip-select";
+import { PowerBadge } from "@/components/power-badge";
+import { CONFERENCE_YEARS } from "@shared/event";
 
 const signupSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -30,9 +33,18 @@ type SignupForm = z.infer<typeof signupSchema>;
 
 export default function Signup() {
   const [, navigate] = useLocation();
-  const { signup } = useAuth();
+  const { signup, user, token } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pastYears, setPastYears] = useState<number[]>([]);
+  const [created, setCreated] = useState(false);
+
+  // Move on only once the new sign-in has reached the rest of the app.
+  // Navigating straight after signup() ran ahead of it, so the profile
+  // set-up page saw nobody signed in and bounced the new attendee away.
+  useEffect(() => {
+    if (created && user && token) navigate("/profile-setup");
+  }, [created, user, token, navigate]);
 
   const form = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
@@ -43,8 +55,8 @@ export default function Signup() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await signup(values);
-      navigate("/profile-setup");
+      await signup({ ...values, pastYears });
+      setCreated(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -62,7 +74,7 @@ export default function Signup() {
         <Wordmark className="text-xl" onDark />
       </Link>
 
-      <div className="w-full max-w-sm relative pu-shape-0 border-2 border-card-border bg-card p-6 sm:p-8 shadow-xl">
+      <div className="w-full max-w-md relative pu-shape-0 border-2 border-card-border bg-card p-6 sm:p-8 shadow-xl">
         <h1 className="text-2xl font-extrabold mb-1.5">Create your account</h1>
         <p className="text-sm text-muted-foreground mb-6">
           Access included with your Power Up Women&rsquo;s Conference registration.
@@ -161,6 +173,27 @@ export default function Signup() {
                 </FormItem>
               )}
             />
+            <div>
+              <p className="text-sm font-medium mb-1" id="past-years-label">
+                Which past Power Up conferences have you attended?
+              </p>
+              <p className="text-xs text-muted-foreground mb-2.5">
+                Tap every year you were there. First time? Leave this blank.
+              </p>
+              <ChipSelect
+                options={CONFERENCE_YEARS}
+                value={pastYears}
+                onChange={setPastYears}
+                label="Past Power Up conferences attended"
+                testIdPrefix="chip-year"
+              />
+              {pastYears.length >= 2 && (
+                <p className="mt-3 text-sm flex flex-wrap items-center gap-2" data-testid="text-signup-badge">
+                  <span>That makes you a</span>
+                  <PowerBadge pastYears={pastYears} />
+                </p>
+              )}
+            </div>
             <Button
               type="submit"
               className="w-full"

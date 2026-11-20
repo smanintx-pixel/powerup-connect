@@ -4,6 +4,8 @@ import {
   connections,
   messages,
   sessions,
+  userPhotos,
+  type UserPhoto,
   type AccessCode,
   type InsertAccessCode,
   type User,
@@ -37,6 +39,11 @@ export interface IStorage {
   listConversation(userId: number, otherUserId: number): Promise<Message[]>;
   listConversationsForUser(userId: number): Promise<Message[]>;
   createMessage(msg: InsertMessage): Promise<Message>;
+
+  // Profile photos
+  setUserPhoto(userId: number, key: string, mime: string, data: string): Promise<void>;
+  getPhotoByKey(key: string): Promise<UserPhoto | undefined>;
+  deleteUserPhoto(userId: number): Promise<void>;
 
   // Sign-in sessions
   createSession(tokenHash: string, userId: number, expiresAt: number): Promise<void>;
@@ -158,6 +165,25 @@ export class DatabaseStorage implements IStorage {
   async createMessage(msg: InsertMessage) {
     const [row] = await getDb().insert(messages).values({ ...msg, createdAt: Date.now() }).returning();
     return row;
+  }
+
+  async setUserPhoto(userId: number, key: string, mime: string, data: string) {
+    await getDb()
+      .insert(userPhotos)
+      .values({ key, userId, mime, data, createdAt: Date.now() })
+      .onConflictDoUpdate({
+        target: userPhotos.userId,
+        set: { key, mime, data, createdAt: Date.now() },
+      });
+  }
+
+  async getPhotoByKey(key: string) {
+    const [row] = await getDb().select().from(userPhotos).where(eq(userPhotos.key, key)).limit(1);
+    return row;
+  }
+
+  async deleteUserPhoto(userId: number) {
+    await getDb().delete(userPhotos).where(eq(userPhotos.userId, userId));
   }
 
   async createSession(tokenHash: string, userId: number, expiresAt: number) {

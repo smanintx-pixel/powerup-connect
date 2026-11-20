@@ -14,11 +14,11 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { useAuth } from "@/lib/auth-context";
-import { InitialsAvatar } from "@/components/initials-avatar";
+import { PhotoUpload } from "@/components/photo-upload";
+import { ProfileExtras, phoneProblem, type ProfileExtrasValue } from "@/components/profile-extras";
 import { X } from "lucide-react";
 
 const profileSchema = z.object({
@@ -26,7 +26,6 @@ const profileSchema = z.object({
   company: z.string().optional(),
   bio: z.string().max(240, "Keep your bio under 240 characters").optional(),
   linkedinUrl: z.string().optional(),
-  photoUrl: z.string().optional(),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -49,6 +48,12 @@ export default function ProfileSetup() {
   const { user, authedFetch, setUser } = useAuth();
   const [tags, setTags] = useState<string[]>(user?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
+  const [extras, setExtras] = useState<ProfileExtrasValue>({
+    phone: user?.phone ?? "",
+    phoneVisible: user?.phoneVisible ?? false,
+    interests: user?.interests ?? [],
+    pastYears: user?.pastYears ?? [],
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -59,7 +64,6 @@ export default function ProfileSetup() {
       company: user?.company ?? "",
       bio: user?.bio ?? "",
       linkedinUrl: user?.linkedinUrl ?? "",
-      photoUrl: user?.photoUrl ?? "",
     },
   });
 
@@ -76,11 +80,18 @@ export default function ProfileSetup() {
 
   async function onSubmit(values: ProfileForm) {
     setError(null);
+    if (phoneProblem(extras.phone)) return;
     setIsSubmitting(true);
     try {
       const res = await authedFetch("/api/users/me", {
         method: "PATCH",
-        body: JSON.stringify({ ...values, tags }),
+        body: JSON.stringify({
+          ...values,
+          tags,
+          phone: extras.phone.trim(),
+          phoneVisible: extras.phoneVisible,
+          interests: extras.interests,
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -96,8 +107,6 @@ export default function ProfileSetup() {
     }
   }
 
-  const photoUrl = form.watch("photoUrl");
-
   return (
     <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-4 py-10">
       <div className="flex items-center gap-2 mb-6">
@@ -111,12 +120,8 @@ export default function ProfileSetup() {
           This is what other attendees will see in the directory.
         </p>
 
-        <div className="flex items-center gap-4 mb-6">
-          <InitialsAvatar name={user?.name ?? ""} photoUrl={photoUrl} className="h-14 w-14" testId="avatar-profile-preview" />
-          <div>
-            <p className="text-sm font-medium" data-testid="text-profile-name">{user?.name}</p>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
-          </div>
+        <div className="mb-6">
+          <PhotoUpload />
         </div>
 
         {error && (
@@ -186,23 +191,9 @@ export default function ProfileSetup() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="photoUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Headshot photo URL (optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." data-testid="input-profile-photo" {...field} />
-                  </FormControl>
-                  <FormDescription>Leave blank to use a generated initials avatar.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Interest / industry tags (up to 3)</label>
+              <label className="text-sm font-medium mb-2 block">Industry tags (up to 3)</label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {tags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="gap-1" data-testid={`badge-tag-${tag.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -249,6 +240,8 @@ export default function ProfileSetup() {
                 ))}
               </div>
             </div>
+
+            <ProfileExtras value={extras} onChange={setExtras} idPrefix="setup" />
 
             <Button type="submit" className="w-full" disabled={isSubmitting} data-testid="button-save-profile">
               {isSubmitting ? "Saving..." : "Save and continue"}

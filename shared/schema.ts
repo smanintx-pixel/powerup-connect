@@ -1,4 +1,4 @@
-import { pgSchema, text, integer, bigint, serial, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, integer, bigint, serial, boolean, uniqueIndex, index } from "drizzle-orm/pg-core";
 
 // All companion-app tables live in their own Postgres schema ("connect") so they
 // stay separate from the ticketing tables in the same Supabase project and are
@@ -6,6 +6,7 @@ import { pgSchema, text, integer, bigint, serial, uniqueIndex, index } from "dri
 export const connect = pgSchema("connect");
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { CONFERENCE_YEARS, INTEREST_OPTIONS } from "./event";
 
 // Access codes bundled with conference registration
 export const accessCodes = connect.table("access_codes", {
@@ -35,9 +36,30 @@ export const users = connect.table("users", {
   linkedinUrl: text("linkedin_url").notNull().default(""),
   photoUrl: text("photo_url").notNull().default(""),
   tags: text("tags").notNull().default("[]"), // JSON string array
+  phone: text("phone").notNull().default(""),
+  phoneVisible: boolean("phone_visible").notNull().default(false), // show phone on her profile
+  interests: text("interests").notNull().default("[]"), // JSON string array, from INTEREST_OPTIONS
+  pastYears: text("past_years").notNull().default("[]"), // JSON number array, from CONFERENCE_YEARS
   accessCode: text("access_code").notNull(),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
 });
+
+// Shared rules for the profile extras (used at sign-up and when editing).
+export const phoneSchema = z
+  .string()
+  .trim()
+  .max(24, "That phone number is too long")
+  .regex(/^[0-9+().\-\s]*$/, "Use digits, spaces and + ( ) - . only")
+  .refine((v) => v === "" || v.replace(/\D/g, "").length >= 7, "Enter a full phone number");
+export const interestsSchema = z
+  .array(z.enum(INTEREST_OPTIONS))
+  .max(INTEREST_OPTIONS.length)
+  .transform((v) => Array.from(new Set(v)));
+export const pastYearsSchema = z
+  .array(z.number().int())
+  .max(CONFERENCE_YEARS.length)
+  .refine((v) => v.every((y) => (CONFERENCE_YEARS as readonly number[]).includes(y)), "Pick from the listed conference years")
+  .transform((v) => Array.from(new Set(v)).sort((a, b) => a - b));
 
 export const insertUserSchema = createInsertSchema(users)
   .omit({ id: true, createdAt: true, passwordHash: true })
@@ -45,12 +67,32 @@ export const insertUserSchema = createInsertSchema(users)
     password: z.string().min(6, "Password must be at least 6 characters"),
     accessCode: z.string().min(1, "Access code is required"),
     tags: z.array(z.string()).optional().default([]),
+    phone: phoneSchema.optional().default(""),
+    phoneVisible: z.boolean().optional().default(false),
+    interests: interestsSchema.optional().default([]),
+    pastYears: pastYearsSchema.optional().default([]),
   });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
-// Public-safe user shape (no password hash)
-export type PublicUser = Omit<User, "passwordHash" | "tags"> & { tags: string[] };
+// Public-safe user shape (no password hash; JSON columns decoded)
+export type PublicUser = Omit<User, "passwordHash" | "tags" | "interests" | "pastYears"> & {
+  tags: string[];
+  interests: string[];
+  pastYears: number[];
+};
+
+// Profile photos. The browser resizes a photo before upload, so each row is
+// small. The key is random and is the only thing that appears in the photo's
+// address, so an address cannot be guessed from a user id.
+export const userPhotos = connect.table("user_photos", {
+  key: text("key").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  mime: text("mime").notNull(),
+  data: text("data").notNull(), // base64
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+});
+export type UserPhoto = typeof userPhotos.$inferSelect;
 
 // Connections — private notes owned by the viewer
 export const connections = connect.table("connections", {

@@ -143,7 +143,13 @@ export async function seedDemoData() {
     return;
   }
 
-  for (const attendee of demoAttendees) {
+  // Give the demo attendees a spread of past conferences and interests so the
+  // badges and the directory filter have something to show.
+  const demoYears = [[2019, 2022, 2023, 2025, 2026], [2025, 2026], [], [2018, 2019, 2020, 2024], [2026], [2023, 2024, 2026]];
+  const demoInterests = [["Networking", "Business Opportunities"], ["Networking", "Social"], ["Employment"], ["Community Engagement", "Networking"], ["Business Opportunities"], ["Social", "Community Engagement"]];
+
+  for (let i = 0; i < demoAttendees.length; i++) {
+    const attendee = demoAttendees[i];
     await storage.createUser({
       name: attendee.name,
       email: attendee.email.toLowerCase(),
@@ -154,6 +160,10 @@ export async function seedDemoData() {
       linkedinUrl: attendee.linkedinUrl,
       photoUrl: "",
       tags: JSON.stringify(attendee.tags),
+      phone: "",
+      phoneVisible: false,
+      interests: JSON.stringify(demoInterests[i % demoInterests.length]),
+      pastYears: JSON.stringify(demoYears[i % demoYears.length]),
       accessCode: DEMO_CODE,
       createdAt: Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 10),
     });

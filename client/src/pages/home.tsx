@@ -17,6 +17,7 @@ import { AppShell } from "@/components/app-shell";
 import { InitialsAvatar } from "@/components/initials-avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { PowerBadge } from "@/components/power-badge";
 import type { PublicUser, Connection, Message } from "@shared/schema";
 
 type ConnectionWithUser = Connection & { user: PublicUser };
@@ -83,14 +84,15 @@ export default function Home() {
   }, [connections.data]);
 
   const profileDone = Boolean(
-    user && user.title && user.company && user.bio && user.tags && user.tags.length > 0
+    user && user.title && user.company && user.bio && user.tags && user.tags.length > 0 &&
+      user.interests && user.interests.length > 0
   );
   const steps = [
     {
       key: "profile",
       done: profileDone,
       title: "Finish your profile",
-      body: "Add your title, company, a short bio and a few tags so the right women can find you.",
+      body: "Add a photo, your title and company, a short bio, tags and what you are here for, so the right women can find you.",
       href: "/settings",
       cta: "Edit profile",
       icon: UserRound,
@@ -174,6 +176,7 @@ export default function Home() {
           <h1 className="text-3xl md:text-5xl font-extrabold leading-tight tracking-tight" data-testid="text-home-welcome">
             Welcome, {user ? firstName(user.name) : "there"}.
           </h1>
+          <PowerBadge pastYears={user?.pastYears} className="mt-2 text-xs px-3 py-1.5 shadow-md" />
           <p className="mt-3 max-w-xl text-base md:text-lg text-white/90 leading-relaxed">
             PowerUp Connect keeps the women you meet at Power Up within reach. Find her, save what
             you talked about, and follow up long after the day ends.
@@ -324,7 +327,7 @@ export default function Home() {
             </li>
             <li className="flex gap-3">
               <UserRound className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-              <span>Other attendees see your name, title, company, bio, tags and LinkedIn link. Your email stays hidden.</span>
+              <span>Other attendees see your photo, name, title, company, bio, tags, what you are here for and your LinkedIn link. Your email stays hidden, and your phone number shows only if you turn that on.</span>
             </li>
           </ul>
         </section>

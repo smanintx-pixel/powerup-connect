@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
 import type { PublicUser, Connection } from "@shared/schema";
-import { ArrowLeft, ExternalLink, Heart, HeartHandshake, Check, MessageCircle } from "lucide-react";
+import { ArrowLeft, ExternalLink, Heart, HeartHandshake, Check, MessageCircle, Phone } from "lucide-react";
+import { PowerBadge } from "@/components/power-badge";
 
 export default function AttendeeProfile() {
   const params = useParams<{ id: string }>();
@@ -138,6 +139,14 @@ export default function AttendeeProfile() {
                 {attendee.title && attendee.company ? " · " : ""}
                 {attendee.company}
               </p>
+              {(attendee.pastYears ?? []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-3" data-testid="text-attendee-years">
+                  <PowerBadge pastYears={attendee.pastYears} />
+                  <span className="text-xs text-muted-foreground">
+                    Attended {attendee.pastYears.join(", ")}
+                  </span>
+                </div>
+              )}
               {attendee.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-4">
                   {attendee.tags.map((tag) => (
@@ -152,7 +161,27 @@ export default function AttendeeProfile() {
                   {attendee.bio}
                 </p>
               )}
+              {(attendee.interests ?? []).length > 0 && (
+                <div className="mb-4" data-testid="text-attendee-interests">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Here for</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {attendee.interests.map((item) => (
+                      <span key={item} className="rounded-full border border-primary/30 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
+                {attendee.phone && (
+                  <a href={`tel:${attendee.phone.replace(/[^0-9+]/g, "")}`} data-testid="link-attendee-phone">
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      {attendee.phone}
+                    </Button>
+                  </a>
+                )}
                 {attendee.linkedinUrl && (
                   <a
                     href={attendee.linkedinUrl}
