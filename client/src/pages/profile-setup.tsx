@@ -88,7 +88,7 @@ export default function ProfileSetup() {
       }
       const data = await res.json();
       setUser(data.user);
-      navigate("/directory");
+      navigate("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

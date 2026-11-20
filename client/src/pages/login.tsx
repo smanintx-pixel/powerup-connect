@@ -40,7 +40,7 @@ export default function Login() {
     setIsSubmitting(true);
     try {
       await login(values.email, values.password);
-      navigate("/directory");
+      navigate("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {

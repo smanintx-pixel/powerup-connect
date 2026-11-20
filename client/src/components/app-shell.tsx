@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Users, Heart, MessageCircle, PlayCircle, Settings, LogOut } from "lucide-react";
+import { House, Users, Heart, MessageCircle, PlayCircle, Settings, LogOut } from "lucide-react";
 import { Logo, Wordmark } from "@/components/logo";
 import { useAuth } from "@/lib/auth-context";
 import { InitialsAvatar } from "@/components/initials-avatar";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV_ITEMS = [
+  { href: "/home", label: "Home", icon: House },
   { href: "/directory", label: "Directory", icon: Users },
   { href: "/connections", label: "Connections", icon: Heart },
   { href: "/messages", label: "Messages", icon: MessageCircle },
@@ -77,12 +78,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile header */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 border-b-2 border-border bg-card sticky top-0 z-40">
-        <Link href="/directory" className="flex items-center gap-2">
+        <Link href="/home" className="flex items-center gap-2">
           <Logo className="h-7 w-7" />
           <Wordmark className="text-base" />
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            data-testid="link-nav-mobile-settings"
+            className={`inline-flex h-9 w-9 items-center justify-center rounded-full hover-elevate active-elevate-2 ${
+              location === "/settings" ? "text-primary" : ""
+            }`}
+          >
+            <Settings className="h-[18px] w-[18px]" />
+          </Link>
           <Button
             variant="ghost"
             size="icon"
@@ -118,20 +129,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               }`}
             >
               <item.icon className="h-5 w-5" />
-              <span className="text-xs font-semibold">{item.label}</span>
+              <span className="text-[11px] font-semibold leading-none">{item.label}</span>
             </Link>
           );
         })}
-        <Link
-          href="/settings"
-          data-testid="link-nav-mobile-settings"
-          className={`flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px] hover-elevate active-elevate-2 ${
-            location === "/settings" ? "text-primary pu-tab-active" : "text-muted-foreground"
-          }`}
-        >
-          <Settings className="h-5 w-5" />
-          <span className="text-xs font-semibold">Settings</span>
-        </Link>
       </nav>
     </div>
   );

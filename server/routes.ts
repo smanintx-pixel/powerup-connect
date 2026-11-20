@@ -16,6 +16,12 @@ function toPublicUser(user: User): PublicUser {
   return { ...rest, tags };
 }
 
+// What one attendee may see about another: the profile, never the email
+// address or the access code she signed up with.
+function toAttendeeView(user: User): PublicUser {
+  return { ...toPublicUser(user), email: "", accessCode: "" };
+}
+
 function getToken(req: Request): string | undefined {
   const header = req.headers["authorization"];
   if (typeof header === "string" && header.startsWith("Bearer ")) {
@@ -144,7 +150,7 @@ export function registerRoutes(app: Express): void {
     const user = await requireAuth(req);
     if (!user) return res.status(401).json({ message: "Not logged in." });
     const all = await storage.listUsers(user.id);
-    res.json({ users: all.map(toPublicUser) });
+    res.json({ users: all.map(toAttendeeView) });
   });
 
   app.get("/api/users/:id", async (req, res) => {
@@ -152,7 +158,7 @@ export function registerRoutes(app: Express): void {
     if (!user) return res.status(401).json({ message: "Not logged in." });
     const target = await storage.getUser(Number(req.params.id));
     if (!target) return res.status(404).json({ message: "Attendee not found." });
-    res.json({ user: toPublicUser(target) });
+    res.json({ user: toAttendeeView(target) });
   });
 
   // ---------- CONNECTIONS ----------
@@ -164,7 +170,7 @@ export function registerRoutes(app: Express): void {
     const withUsers = await Promise.all(
       conns.map(async (c) => {
         const other = await storage.getUser(c.connectedUserId);
-        return { ...c, user: other ? toPublicUser(other) : null };
+        return { ...c, user: other ? toAttendeeView(other) : null };
       })
     );
     res.json({ connections: withUsers.filter((c) => c.user !== null) });
@@ -218,7 +224,7 @@ export function registerRoutes(app: Express): void {
         const thread = all.filter((m) => m.senderId === otherId || m.receiverId === otherId);
         const last = thread.sort((a, b) => b.createdAt - a.createdAt)[0];
         return other
-          ? { user: toPublicUser(other), lastMessage: last ?? null }
+          ? { user: toAttendeeView(other), lastMessage: last ?? null }
           : null;
       })
     );

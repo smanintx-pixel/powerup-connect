@@ -10,6 +10,7 @@ import Landing from "@/pages/landing";
 import Signup from "@/pages/signup";
 import Login from "@/pages/login";
 import ProfileSetup from "@/pages/profile-setup";
+import Home from "@/pages/home";
 import Directory from "@/pages/directory";
 import AttendeeProfile from "@/pages/attendee-profile";
 import Connections from "@/pages/connections";
@@ -33,7 +34,7 @@ function RedirectIfAuthed({ children }: { children: ReactNode }) {
   const { user, token, ready } = useAuth();
   if (!ready) return null;
   if (user && token) {
-    return <Redirect to="/directory" />;
+    return <Redirect to="/home" />;
   }
   return <>{children}</>;
 }
@@ -57,6 +58,11 @@ function AppRouter() {
       <Route path="/profile-setup">
         <RequireAuth>
           <ProfileSetup />
+        </RequireAuth>
+      </Route>
+      <Route path="/home">
+        <RequireAuth>
+          <Home />
         </RequireAuth>
       </Route>
       <Route path="/directory">
