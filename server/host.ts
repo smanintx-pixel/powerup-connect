@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { User, SessionWithMaterials } from "../shared/schema";
+import type { SessionTokenRequest } from "@nuancelabs/js-sdk"; // types only, so the request shape is checked at build time
 import { loyaltyBadge } from "../shared/event";
 
 /**
@@ -106,7 +107,7 @@ export async function mintHostToken(user: User, sessions: SessionWithMaterials[]
   // Nuance asks for an id that does not identify the person: a hash, never a name or email.
   const endUserId = "pu_" + crypto.createHash("sha256").update(`powerup-connect:host:${user.id}`).digest("hex").slice(0, 32);
 
-  const body = {
+  const body: SessionTokenRequest = {
     interface: "nuance_live",
     end_user_id: endUserId,
     personality: {
@@ -114,7 +115,7 @@ export async function mintHostToken(user: User, sessions: SessionWithMaterials[]
       ...(PERSONAS.includes(persona) && persona !== "sam" ? { persona_id: persona } : {}),
     },
     interface_setup: {
-      delegation: "none", // she answers from her brief; nothing is handed off to tools
+      delegation: { type: "none" }, // she answers from her brief; nothing is handed off to tools
       runtime_tools: { stay_quiet: true, end_call: true },
       video: { input: { camera: false } }, // she never looks through the attendee's camera
     },
@@ -138,7 +139,11 @@ export async function mintHostToken(user: User, sessions: SessionWithMaterials[]
 
   // Log the status and code only. Never the key, the prompt or the token.
   const code = typeof data.code === "string" ? data.code : typeof (data.detail as any)?.code === "string" ? (data.detail as any).code : "";
-  console.error(`[host] token refused status=${res.status} code=${code || "none"}`);
+  // For a 422 also log which field was refused (its path and reason, not its value).
+  const where = Array.isArray(data.detail)
+    ? (data.detail as any[]).slice(0, 3).map((d) => `${Array.isArray(d?.loc) ? d.loc.join(".") : "?"}: ${String(d?.msg ?? "").slice(0, 120)}`).join(" | ")
+    : typeof data.detail === "string" ? data.detail.slice(0, 160) : "";
+  console.error(`[host] token refused status=${res.status} code=${code || "none"}${res.status === 422 && where ? ` where=${where}` : ""}`);
   const friendly: Record<number, string> = {
     401: `${HOST_NAME} is not set up correctly yet. Please tell the conference team.`,
     403: `${HOST_NAME} is paused right now. Please try again later.`,
