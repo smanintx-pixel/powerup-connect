@@ -103,7 +103,7 @@ export async function mintHostToken(user: User, sessions: SessionWithMaterials[]
   const key = process.env.NUANCE_API_KEY;
   if (!key) return { ok: false, status: 503, code: "not_configured", message: `${HOST_NAME} is not switched on yet.` };
 
-  const persona = (process.env.NUANCE_PERSONA_ID || "sonia").toLowerCase();
+  const persona = (process.env.NUANCE_PERSONA_ID || "mira").toLowerCase();
   // Nuance asks for an id that does not identify the person: a hash, never a name or email.
   const endUserId = "pu_" + crypto.createHash("sha256").update(`powerup-connect:host:${user.id}`).digest("hex").slice(0, 32);
 
