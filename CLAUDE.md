@@ -24,7 +24,7 @@ npm run build && NODE_ENV=production node dist/index.cjs
 Access code: POWERUP2027
 Logins (password Powerup2027!): amara@brightpathventures.com, priya@lumenfinancial.com, sofia@risecoaching.co
 
-Landing page sample cards (Denise Carter, Cheryl Washington, Tamika Brooks) are invented people; their portraits in client/src/assets/sample-*.jpg are AI-generated, not real attendees.
+The landing page sample cards and the 12 demo attendees are invented people. Their portraits (client/src/assets/sample-*.jpg, client/public/demo/*.jpg, served at /demo/<name>.jpg) are AI-generated, not real attendees. Demo attendees were renamed on 2026-11-19 but kept their sign-in emails, so the emails no longer match the names. In the live database, user 1 (amara@…) was personalised by the owners and is left alone.
 
 ## Known prototype limits
 - Sign-in sessions are rows in connect.sessions (30 days); the token is kept in the browser's localStorage. No password reset or sign-in rate limiting yet.
